@@ -164,6 +164,21 @@ class TextLevel(Level):
                 eurydice_sum_len: t.Optional[int]=0,
 
             ) -> int:
+            def _cleanup(
+                    notes,
+                    total,
+                    is_eurydices_turn,
+                    eurydice_sum_len,
+                ):
+                self.print_header()
+                self.print_lyre_prompt(
+                    notes,
+                    total,
+                    is_eurydices_turn,
+                    eurydice_sum_len,
+                )
+                return input()
+            
             if (is_eurydices_turn):
                 self.print_lyre_prompt(
                     notes,
@@ -174,22 +189,27 @@ class TextLevel(Level):
             i = input()
             while(i != "X"):
                 note = self.level.lyre.get_note(i)
-                notes.append(note)
-                total += note.val
+                skip = False
 
                 try:
                     self.level.lyre.play_note(i)
+                except Lyre.NoSuchNoteException:
+                    print("Your lyre has no such string.")
+                    skip = True
                 except Lyre.NoteDepletedException:
                     print("You can't play that note anymore.")
+                    skip = True
+                
+                if not skip:
+                    notes.append(note)
+                    total += note.val
 
-                self.print_header()
-                self.print_lyre_prompt(
+                i = _cleanup(
                     notes,
                     total,
                     is_eurydices_turn,
                     eurydice_sum_len,
                 )
-                i = input()
             return total
 
         success_idx = 0
@@ -224,14 +244,6 @@ class TextLevel(Level):
         self.level.try_eurydice(total, eurydice_sum_length)
         self.print_header()
 
-
-
-
-        
-
-
-
-        
 def main() -> None:
     json_path = pathlib.Path("levels/level1.json")
     lvl1 = TextLevel.from_json(json_path)
