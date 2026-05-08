@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import typing as t
 
@@ -7,53 +8,32 @@ from guiding_eurydice_core.src.level import Goal, Level, Lyre, Note
 class TextLevel(Level):
     def __init__(
         self,
-        title: t.Optional[str],
-        lyre: t.Optional[Lyre],
-        orpheus_goal: t.Optional[Goal],
-        descriptions: t.Optional[t.List[str]],
-        success_text: t.Optional[t.List[str]],
-        fail_text: t.Optional[t.List[str]],
-        fatal_text: t.Optional[t.List[str]],
+        title: t.Optional[str]="",
+        lyre: t.Optional[Lyre]=Lyre(),
+        orpheus_goal: t.Optional[Goal]=Goal(),
+        descriptions: t.Optional[t.List[str]]=[],
+        success_text: t.Optional[t.List[str]]=[],
+        fail_text: t.Optional[t.List[str]]=[],
+        fatal_text: t.Optional[t.List[str]]=[],
+        debug: t.Optional[bool]=False,
     ) -> TextLevel:
-        
-        l = Lyre({})
-        if lyre is not None:
-            l = lyre
-        
-        og = Goal(-1)
-        if orpheus_goal is not None:
-            og = orpheus_goal
+        self.level = Level()
 
-        self.level = Level(l, og)
+        self.title = title
+        self.descriptions = descriptions
+        self.success_text = success_text
+        self.fail_text = fail_text
+        self.fatal_text = fatal_text
+        self.debug = debug
 
-        if title is not None:
-            self.title = title
-        else:
-            self.title = ""
-        
-        if descriptions is not None:
-            self.description = descriptions
-        else:
-            self.description = []
-
-        if success_text is not None:
-            self.success_text = success_text
-        else:
-            self.success_text = []
-        
-        if fail_text is not None:
-            self.fail_text = fail_text
-        else:
-            self.fail_text = []
-        
-        if fatal_text is not None:
-            self.fatal_text = fatal_text
-        else:
-            self.fatal_text = []
+        self.level.lyre = lyre
+        self.level.orpheus_goal = orpheus_goal
+        self.level.debug = debug
 
     @staticmethod
     def from_json(
         json_path: pathlib.Path,
+        debug: t.Optional[bool]=False,
     ) -> TextLevel:
         title = None
         lyre = None
@@ -97,11 +77,17 @@ class TextLevel(Level):
             if ("fatal_text" in data.keys()) and (isinstance(data["fatal_text"], list)):
                 fatal_text = data["fatal_text"]
 
-            return TextLevel(title, lyre, orpheus_goal, descriptions, success_text, fail_text, fatal_text)
-                                        
+            return TextLevel(title, lyre, orpheus_goal, descriptions, success_text, fail_text, fatal_text, debug)
+
+    def reset(self):
+        self.level.reset()
+
     def print_header(self):
         header = f"LEVEL {self.level.id}: {self.title.upper()}"
-        header += f"({str(self.level.get_state())})"
+
+        if self.debug:
+            header += f"({str(self.level.get_state())})"
+
         print()
         print("=" * len(header))
         print(header)
@@ -109,15 +95,15 @@ class TextLevel(Level):
         print()
         print(self.level)
 
-    def print_total(self, total: int):
-        total_str = "TOTAL: " + "{:02d}".format(total)
-        print("-" * len(total_str))
-        print(total_str)
-
     def print_success_msg(self, idx: int):
         while idx >= len(self.success_text):
             idx -= len(self.success_text)
         print(self.success_text[idx])
+
+    def print_fail_msg(self, idx: int):
+        while idx >= len(self.fail_text):
+            idx -= len(self.fail_text)
+        print(self.fail_text[idx])
     
     def print_fatal_msg(self, idx: int):
         while idx >= len(self.fatal_text):
@@ -157,6 +143,74 @@ class TextLevel(Level):
         print(sum_str)
     
     def run(self):
+        def _end_level():
+            def _print_demise_str():
+                def _get_len_of_longest_str(arr: t.List[str]) -> int:
+                    champ = 0
+
+                    for s in arr:
+                        if len(s) > champ:
+                            champ = len(s)
+                    
+                    return champ
+                
+                def _get_padding(term_width: int, len: int) -> int:
+                    padding = int((term_width - len) / 2)
+                    if padding < 0:
+                        padding = 0
+                    return int(padding * 0.75)
+
+                def _get_suffix(s: str, longest_len: int) -> str:
+                    spaces = longest_len - len(s)
+                    return " " * spaces + " |"
+
+
+                demise_strs = [
+                                    "Because he loved her, he glanced behind him.",
+                                    "She instantly fell back. Poor Orpheus",
+                                    "stretched out both his arms, trying to hold her",
+                                    "and be held. He caught nothing but thin air.",
+                                ]
+
+                longest_len = _get_len_of_longest_str(demise_strs)
+                term_width = os.get_terminal_size().columns
+
+                
+                print()
+                
+                padding = _get_padding(term_width, longest_len)
+
+                print(
+                    " " * padding,
+                    "-" * (longest_len + 4),
+                )
+
+                for s in demise_strs:
+                    res =  "| " + s + _get_suffix(s, longest_len) 
+                    print(" " * padding, res, " " * padding)
+                
+                print(
+                    " " * padding,
+                    "-" * (longest_len + 4),
+                )
+                print()
+            
+            if self.level.state == Level.LevelState.SUCCESS:
+                return
+            if self.level.state in [Level.LevelState.ORPHEUS_FATAL, Level.LevelState.EURYDICE_FATAL]:
+                print("Press any key to look back")
+                _ = input()
+                _print_demise_str()               
+
+            print("Press X to quit. Press any key to try again.")
+
+            i = input()
+            if (i == "X"):
+                return
+            
+            self.reset()
+            self.run()
+
         def _accept_notes(
                 notes: t.List[Note],
                 total: int,
@@ -213,6 +267,7 @@ class TextLevel(Level):
             return total
 
         success_idx = 0
+        fail_idx = 0
         fatal_idx = 0
 
         self.print_header()
@@ -223,6 +278,7 @@ class TextLevel(Level):
         if self.level.state == Level.LevelState.ORPHEUS_FATAL:
             self.print_fatal_msg(fatal_idx)
             fatal_idx += 1
+            _end_level()
             return
         
         if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
@@ -233,24 +289,26 @@ class TextLevel(Level):
         success_idx += 1
 
         eurydice_sum_length = self.level.set_eurydice_goal()
-        self.print_header()
-        total = _accept_notes(
-            [],
-            0,
-            True,
-            eurydice_sum_length,
-            )
 
-        self.level.try_eurydice(total, eurydice_sum_length)
-        self.print_header()
+        while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (self.level.state == Level.LevelState.EURYDICE_FAIL):
+            self.print_header()
+            total = _accept_notes(
+                [],
+                0,
+                True,
+                eurydice_sum_length,
+                )
 
-def main() -> None:
-    json_path = pathlib.Path("levels/level1.json")
-    lvl1 = TextLevel.from_json(json_path)
-    lvl1.run()
+            self.level.try_eurydice(total, eurydice_sum_length)
 
-if __name__ == "__main__":
-    main()
+            if self.level.state == Level.LevelState.EURYDICE_FAIL:
+                self.print_fail_msg(fail_idx)
+                fail_idx += 1
+                continue
+            else:
+                break
+
+        _end_level()          
 
 
 
