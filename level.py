@@ -123,41 +123,113 @@ class TextLevel(Level):
         while idx >= len(self.fatal_text):
             idx += len(self.fatal_text)
         print(self.fatal_text[idx])
+
+    def print_lyre_prompt(
+        self,
+        notes: t.List[Note],
+        total: int,
+        is_eurydices_turn: bool,
+        eurydice_sum_len: t.Optional[int],
+    ):
+        i = 0
+        sum_str = ""
+
+        lyre_prompt = "Type the name of a note and press Enter to play it. Press X to finish your song."
+        print(lyre_prompt)
+        print("-" * len(lyre_prompt))
+
+        if is_eurydices_turn:
+            while i < len(notes):
+                sum_str += str(notes[i].val) + " + "
+                i += 1
+            
+            while i < eurydice_sum_len:
+                sum_str += "_ + "
+                i += 1
+            
+        else:
+            while i < len(notes):
+                sum_str += str(notes[i].val) + " + "
+                i += 1
+
+        sum_str = sum_str[:-3] + " = " + str(total)
+
+        print(sum_str)
     
     def run(self):
-        total = 0
-        notes : t.List[Note] = []
+        def _accept_notes(
+                notes: t.List[Note],
+                total: int,
+                is_eurydices_turn: t.Optional[bool]=False,
+                eurydice_sum_len: t.Optional[int]=0,
+
+            ) -> int:
+            if (is_eurydices_turn):
+                self.print_lyre_prompt(
+                    notes,
+                    total,
+                    is_eurydices_turn,
+                    eurydice_sum_len,
+                )
+            i = input()
+            while(i != "X"):
+                note = self.level.lyre.get_note(i)
+                notes.append(note)
+                total += note.val
+
+                try:
+                    self.level.lyre.play_note(i)
+                except Lyre.NoteDepletedException:
+                    print("You can't play that note anymore.")
+
+                self.print_header()
+                self.print_lyre_prompt(
+                    notes,
+                    total,
+                    is_eurydices_turn,
+                    eurydice_sum_len,
+                )
+                i = input()
+            return total
 
         success_idx = 0
         fatal_idx = 0
 
         self.print_header()
 
-        print("Type the name of a note and press Enter to play it. Press X to finish your song.")
+        total = _accept_notes([], 0)
+        self.level.try_orpheus(total)
 
-        i = input()
-        while(i != "X"):
-            note = self.level.lyre.get_note(i)
-            notes.append(note)
-            total += note.val
-
-            try:
-                self.level.lyre.play_note(i)
-            except Lyre.NoteDepletedException:
-                print("You can't play that note anymore.")
-
-            self.print_header()
-            self.print_total(total)
-            i = input()
-        
-        self.level.try_orpheus(notes)
-
-        if self.level.state == Level.LevelState.ORPHEUS_SUCCESS:
-            self.print_success_msg(success_idx)
-            success_idx += 1
-        elif self.level.state == Level.LevelState.ORPHEUS_FATAL:
+        if self.level.state == Level.LevelState.ORPHEUS_FATAL:
             self.print_fatal_msg(fatal_idx)
             fatal_idx += 1
+            return
+        
+        if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
+            print(f"Got unexpected level state {str(self.level.state)}")
+            return
+        
+        self.print_success_msg(success_idx)
+        success_idx += 1
+
+        eurydice_sum_length = self.level.set_eurydice_goal()
+        self.print_header()
+        total = _accept_notes(
+            [],
+            0,
+            True,
+            eurydice_sum_length,
+            )
+
+        self.level.try_eurydice(total, eurydice_sum_length)
+        self.print_header()
+
+
+
+
+        
+
+
 
         
 def main() -> None:
