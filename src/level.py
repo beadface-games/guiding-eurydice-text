@@ -122,7 +122,7 @@ class TextLevel(Level):
     def _get_vertical_padding(
             term_height: int,
             lines: t.List[str],
-            num_extra_lines: t.Optional[int]=0
+            num_extra_lines: t.Optional[int]=0,
         ) -> int:
         actual_lines = num_extra_lines
 
@@ -161,6 +161,40 @@ class TextLevel(Level):
       for _ in range(n):
         print("\033[F\033[K", end="")
 
+    
+    @staticmethod
+    def center_text(
+        line: t.Optional[str]=None,
+        lines: t.Optional[t.List[str]]=None,
+    ) -> str:
+        res = ""
+        
+        if line and (not lines):
+            horizontal_padding = TextLevel._get_horizontal_padding(TextLevel._get_term_width(), line)
+            vertical_padding = TextLevel._get_vertical_padding(TextLevel._get_term_height(), [line])
+
+            res = (
+                "\n" * vertical_padding +
+                " " * horizontal_padding +
+                line +
+                " " * horizontal_padding +
+                "\n" * vertical_padding
+            )
+        elif lines and (not line):
+            longest_line = TextLevel.get_longest_str(lines)
+            horizontal_padding = TextLevel._get_horizontal_padding(TextLevel._get_term_width(), longest_line)
+            vertical_padding = TextLevel._get_vertical_padding(TextLevel._get_term_height(), lines)
+
+            res =  ("\n" * vertical_padding) + (" " * horizontal_padding)
+
+            for line in lines:
+                res += (" " * horizontal_padding) + (" " * int((len(longest_line) - len(line)) / 2)) + line + "\n"
+            
+            res += (" " * horizontal_padding) + ("\n" * vertical_padding)
+        
+        return res     
+    
+
     @staticmethod
     def flash_msg(msg: str, time_in_s: float, iterations: int):
         for _ in range(iterations):
@@ -183,29 +217,27 @@ class TextLevel(Level):
         print()
         print(self.level)
 
-    def print_success_msg(self, idx: int):
-        if not self.success_text:
-            return
-        print(self.success_text[idx % len(self.success_text)])
-
-    def print_fail_msg(self, idx: int):
-        if not self.fail_text:
-            return
-        print(self.fail_text[idx % len(self.fail_text)])
-
-    def print_fatal_msg(self, idx: int, linger_time_s: t.Optional[int]=3):
+    def print_success_msg(self, linger_time_s: t.Optional[int]=3):
         TextLevel.clear_screen()
-        fatal_msg = self.fatal_text[idx % len(self.fatal_text)]
-        horizontal_padding = TextLevel._get_horizontal_padding(TextLevel._get_term_width(), fatal_msg)
-        vertical_padding = TextLevel._get_vertical_padding(TextLevel._get_term_height(), [fatal_msg])
-
-        print(
-            "\n" * vertical_padding,
-            " " * horizontal_padding,
-            fatal_msg,
-            " " * horizontal_padding,
-            "\n" * vertical_padding)
+        success_msg = self.success_text[self.success_idx % len(self.success_text)]
+        print(TextLevel.center_text(success_msg))
         time.sleep(linger_time_s)
+        self.success_idx += 1
+
+    def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
+        TextLevel.clear_screen()
+        fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
+        print(TextLevel.center_text(fail_msg))
+        time.sleep(linger_time_s)
+        self.fail_idx += 1
+
+
+    def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
+        TextLevel.clear_screen()
+        fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
+        print(TextLevel.center_text(fatal_msg))
+        time.sleep(linger_time_s)
+        self.fatal_idx += 1
 
     def format_song_line(
         self,
@@ -310,7 +342,7 @@ class TextLevel(Level):
                 return
             
             if self.level.state == Level.LevelState.ORPHEUS_FATAL:
-                self.print_fatal_msg(self.fatal_idx)
+                self.print_fatal_msg()
                 self.fatal_idx += 1
                 _force_look_back()
             elif self.level.state == Level.LevelState.EURYDICE_FATAL:
@@ -331,7 +363,7 @@ class TextLevel(Level):
             total: int,
             is_eurydices_turn: t.Optional[bool] = False,
             eurydice_sum_len: t.Optional[int] = 0,
-        ) -> int:
+        ) -> t.Tuple[int, int]:
             TextLevel.clear_screen()
             self.print_header()
             self.print_lyre_prompt()
@@ -371,13 +403,13 @@ class TextLevel(Level):
                     warning,
                 )
 
-            return total
+            return total, len(notes)
 
         TextLevel.clear_screen()
         self.print_header()
         self.print_lyre_prompt()
       
-        total = _accept_notes([], 0)
+        total, _ = _accept_notes([], 0)
         self.level.try_orpheus(total)
 
         if self.level.state == Level.LevelState.ORPHEUS_FATAL:
@@ -388,30 +420,53 @@ class TextLevel(Level):
             print(f"Got unexpected level state {str(self.level.state)}")
             return
 
-        self.print_success_msg(self.success_idx)
-        self.success_idx += 1
+        self.print_success_msg()
 
         eurydice_sum_length = self.level.set_eurydice_goal()
+        self.level.check_eurydice(eurydice_sum_length)
+
+        if self.level.state == Level.LevelState.EURYDICE_THWARTED:
+            print("Orpheus has thwarted Eurydice - time to debug")
+            return
+        
+        backup_lyre = self.level.lyre.copy()
 
         while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
             self.level.state == Level.LevelState.EURYDICE_FAIL
         ):
             print()
             self.print_lyre_prompt()
-            total = _accept_notes(
+            total, num_notes = _accept_notes(
                 [],
                 0,
                 True,
                 eurydice_sum_length,
             )
 
-            self.level.try_eurydice(total, eurydice_sum_length)
+            self.level.check_eurydice(eurydice_sum_length)
+            print(f"Level state is {str(self.level.state)} after checking")
+
+            if self.level.state == Level.LevelState.EURYDICE_THWARTED:
+                TextLevel.clear_screen()
+                lines = [
+                    "In your attempts to guide her, you have left Eurydice with no path forward.",
+                    "The gods mercifully restore your lyre so that you may try again.",
+                    "Press any key to continue",
+                ]
+                print(TextLevel.center_text(lines=lines))
+
+                if self.debug:
+                    print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
+                self.level.eurydice_lives -= 1
+                self.level.lyre = backup_lyre
+                self.level.state = Level.LevelState.ORPHEUS_SUCCESS
+                _ = input()
+                continue
+
+            self.level.try_eurydice(num_notes, total, eurydice_sum_length)
 
             if self.level.state == Level.LevelState.EURYDICE_FAIL:
-                self.print_fail_msg(self.fail_idx)
-                self.fail_idx += 1
+                self.print_fail_msg()
                 continue
-            else:
-                break
 
         _end_level()
