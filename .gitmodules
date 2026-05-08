@@ -1,0 +1,3 @@
+[submodule "guiding_eurydice_core"]
+	path = guiding_eurydice_core
+	url = https://github.com/beadface-tess/guiding-eurydice-core.git
