@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 import time
 import typing as t
 
@@ -10,6 +11,9 @@ from src._utils import TextUtility
 
 
 class TextLevel(Level):
+    class QuitGameException(Exception):
+        pass
+
     def __init__(
         self,
         title: t.Optional[str] = "",
@@ -46,7 +50,7 @@ class TextLevel(Level):
             given_seed,
         )   
 
-        self.text_utility = TextUtility()
+        self.text_utility = TextUtility(rng=self.level.rng)
 
     @staticmethod
     def from_json(
@@ -116,7 +120,7 @@ class TextLevel(Level):
         self.level.reset()
 
     def print_header(self):
-        title_line = f"LEVEL {self.level.id}: {self.title.upper()}  - seed={str(self.level.seed)}"
+        title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
@@ -214,21 +218,27 @@ class TextLevel(Level):
         return input(f"{song_line}\n{warning}\n> ").strip()
 
     def run(self):
+        def _graceful_shutdown():
+            self.text_utility.clear_screen()
+            self.text_utility.fade_msg(
+                    "Your song dwindles into nothingness...",
+                    1000,
+                    4,
+                    min_time_in_ms_per_it=250,
+                )
+            time.sleep(1)
+            raise SystemExit(0)
+        
         def _end_level():            
             def _force_look_back():
                 demand = "Press any key to look back".upper()
-                horizontal_padding = self.text_utility.get_horizontal_padding(self.text_utility.get_term_width(), demand) 
-                vertical_padding = self.text_utility.get_vertical_padding(self.text_utility.get_term_height(), [demand])
-                self.text_utility.flash_msg(("\n" * vertical_padding) + (">" * horizontal_padding) + demand + ("<" * horizontal_padding) + ("\n" * vertical_padding), 1, 3)
+                self.text_utility.flash_msg(self.text_utility.center_text(line=demand), 1, 3)
                 _ = input()
                 self.text_utility.clear_screen()
                 _print_demise_str()
                 time.sleep(3)
             
             def _print_demise_str():
-                def _get_suffix(s: str, longest_str: str) -> str:
-                    spaces = len(longest_str) - len(s)
-                    return " " * spaces + " |"
 
                 demise_strs = [
                     "Because he loved her, he glanced behind him.",
@@ -237,29 +247,7 @@ class TextLevel(Level):
                     "and be held. He caught nothing but thin air.",
                 ]
 
-                longest_str = self.text_utility.get_longest_str(demise_strs)
-
-                print()
-
-                horizontal_padding = self.text_utility.get_horizontal_padding(self.text_utility.get_term_width(), longest_str) - 1
-                vertical_padding = self.text_utility.get_vertical_padding(self.text_utility.get_term_height(), demise_strs, 2)
-
-                print(
-                    "\n" * vertical_padding,
-                    " " * (horizontal_padding - 1),
-                    "-" * (len(longest_str) + 4),
-                )
-
-                for s in demise_strs:
-                    res = "| " + s + _get_suffix(s, longest_str)
-                    print(" " * horizontal_padding, res, " " * horizontal_padding)
-
-                print(
-                    " " * horizontal_padding,
-                    "-" * (len(longest_str) + 4),
-                    "\n" * vertical_padding
-                )
-                print()
+                print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(demise_strs)))
 
             if self.level.state == Level.LevelState.SUCCESS:
                 return
@@ -272,10 +260,10 @@ class TextLevel(Level):
                 print("Eurydice is lost.")
                 _force_look_back()
 
-            print("Press X to quit. Press any key to try again.")
+            print("Press Q to quit. Press any other key to try again.")
 
             i = input().strip()
-            if i.upper() == "X":
+            if i.upper() == "Q":
                 return
 
             self.reset()
@@ -296,8 +284,8 @@ class TextLevel(Level):
                 bool(is_eurydices_turn),
                 eurydice_sum_len,
             )
-        
-            while i.upper() != "X":
+
+            while (i.upper() != "X") and (i.upper() != "Q"):
                 note = self.level.lyre.get_note(i)
                 skip = False
                 warning = ""
@@ -325,59 +313,68 @@ class TextLevel(Level):
                     eurydice_sum_len,
                     warning,
                 )
+            
+            if i.upper() == "Q":
+                raise TextLevel.QuitGameException()
 
             return total, len(notes)
 
-        self.print_header()
-        self.print_lyre_prompt()
-      
-        total, _ = _accept_notes([], 0)
-        self.level.try_orpheus(total)
-
-        if self.level.state == Level.LevelState.ORPHEUS_FATAL:
-            _end_level()
-            return
-
-        if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
-            print(f"Got unexpected level state {str(self.level.state)}")
-            return
-
-        self.print_success_msg()
-
-        eurydice_sum_length = self.level.set_eurydice_goal()
-        
-        while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
-            self.level.state == Level.LevelState.EURYDICE_FAIL
-        ):
-            self.level.back_up_lyre()
-            self.level.back_up_rng()
-            print()
+        try:
+            self.print_header()
             self.print_lyre_prompt()
-            total, num_notes = _accept_notes(
-                [],
-                0,
-                True,
-                eurydice_sum_length,
-            )
+        
+            total, _ = _accept_notes([], 0)
+            self.level.try_orpheus(total)
 
-            self.level.check_eurydice(num_notes, total, eurydice_sum_length)
+            if self.level.state == Level.LevelState.ORPHEUS_FATAL:
+                _end_level()
+                return
 
-            if self.level.state == Level.LevelState.EURYDICE_THWARTED:
-                self.text_utility.clear_screen()
-                lines = [
-                    "In your attempts to guide her, you have left Eurydice with no path forward.",
-                    "The gods mercifully restore your lyre so that you may try again.",
-                    "Press any key to continue",
-                ]
-                print(self.text_utility.center_text(lines=lines))
+            if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
+                print(f"Got unexpected level state {str(self.level.state)}")
+                return
 
-                if self.debug:
-                    print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
-                _ = input()
-                continue
+            self.print_success_msg()
 
-            if self.level.state == Level.LevelState.EURYDICE_FAIL:
-                self.print_fail_msg()
-                continue
+            eurydice_sum_length = self.level.set_eurydice_goal()
+            
+            while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
+                self.level.state == Level.LevelState.EURYDICE_FAIL
+            ):
+                self.level.back_up_lyre()
+                self.level.back_up_rng()
+                print()
+                self.print_lyre_prompt()
+                total, num_notes = _accept_notes(
+                    [],
+                    0,
+                    True,
+                    eurydice_sum_length,
+                )
 
-        _end_level()
+                self.level.check_eurydice(num_notes, total, eurydice_sum_length)
+
+                if self.level.state == Level.LevelState.EURYDICE_THWARTED:
+                    self.text_utility.clear_screen()
+                    lines = [
+                        "In your attempts to guide her, you have left Eurydice with no path forward.",
+                        "The gods mercifully restore your lyre so that you may try again.",
+                        "Press any key to continue",
+                    ]
+                    print(self.text_utility.center_text(lines=lines))
+
+                    if self.debug:
+                        print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
+                    _ = input()
+                    self.level.resolve_thwart()
+                    continue
+
+                if self.level.state == Level.LevelState.EURYDICE_FAIL:
+                    self.print_fail_msg()
+                    continue
+
+            _end_level()
+        except KeyboardInterrupt:
+            _graceful_shutdown()
+        except TextLevel.QuitGameException:
+            _graceful_shutdown()
