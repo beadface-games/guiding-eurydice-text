@@ -6,9 +6,9 @@ import sys
 import time
 import typing as t
 
-from guiding_eurydice_core.src.level import Goal, Level, Lyre, Note
+from guiding_eurydice_core.src.lyre import Lyre, Note
+from guiding_eurydice_core.src.level import Goal, Level
 from src._utils import TextUtility
-
 
 class TextLevel(Level):
     class QuitGameException(Exception):
@@ -187,10 +187,15 @@ class TextLevel(Level):
 
         return f"{left_side} = {total}"
 
-    def print_lyre_prompt(self):
+    def print_lyre_prompt(
+            self,
+        ):
         print()
 
-        lyre_prompts = ["Type the name of a note and press Enter to play it.", "Press X to finish your song."]
+        lyre_prompts = [
+            "Type the name of a note and press Enter to play it.",
+            "Press X to finish your song.",
+        ]
 
         for prompt in lyre_prompts:
             print(prompt)
@@ -239,7 +244,6 @@ class TextLevel(Level):
                 time.sleep(3)
             
             def _print_demise_str():
-
                 demise_strs = [
                     "Because he loved her, he glanced behind him.",
                     "She instantly fell back. Poor Orpheus",
