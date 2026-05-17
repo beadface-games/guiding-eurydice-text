@@ -20,6 +20,8 @@ class TextLevel(Level):
         orpheus_goal: t.Optional[Goal] = None,
         orpheus_only: t.Optional[bool] = False,
         descriptions: t.Optional[t.List[str]] = None,
+        orpheus_prompts: t.Optional[t.List[str]] = None,
+        deduction_prompts: t.Optional[t.List[str]] = None,
         success_text: t.Optional[t.List[str]] = None,
         fail_text: t.Optional[t.List[str]] = None,
         fatal_text: t.Optional[t.List[str]] = None,
@@ -28,6 +30,8 @@ class TextLevel(Level):
     ) -> None:
         self.title = title or ""
         self.descriptions = descriptions or []
+        self.deduction_prompts = deduction_prompts or []
+        self.orpheus_prompts = orpheus_prompts or []
         self.success_text = success_text or []
         self.fail_text = fail_text or []
         self.fatal_text = fatal_text or []
@@ -38,7 +42,7 @@ class TextLevel(Level):
         self.orpheus_only = orpheus_only
 
         self.description_idx = 0
-        self.success_idx = 0
+        self.phase_prompt_idx = 0
         self.fail_idx = 0
         self.fatal_idx = 0
 
@@ -65,6 +69,8 @@ class TextLevel(Level):
         orpheus_goal = None
         orpheus_only = False
         descriptions = None
+        orpheus_prompts = None
+        deduction_prompts = None
         success_text = None
         fail_text = None
         fatal_text = None
@@ -101,6 +107,12 @@ class TextLevel(Level):
             if ("descriptions" in data.keys()) and (isinstance(data["descriptions"], list)):
                 descriptions = data["descriptions"]
 
+            if ("orpheus_prompts" in data.keys()) and (isinstance(data["orpheus_prompts"], list)):
+                orpheus_prompts = data["orpheus_prompts"]
+
+            if ("deduction_prompts" in data.keys()) and (isinstance(data["deduction_prompts"], list)):
+                deduction_prompts = data["deduction_prompts"]
+
             if ("success_text" in data.keys()) and (isinstance(data["success_text"], list)):
                 success_text = data["success_text"]
 
@@ -116,6 +128,8 @@ class TextLevel(Level):
                 orpheus_goal,
                 orpheus_only,
                 descriptions,
+                orpheus_prompts,
+                deduction_prompts,
                 success_text,
                 fail_text,
                 fatal_text,
@@ -126,122 +140,7 @@ class TextLevel(Level):
     def reset(self):
         self.level.reset()
 
-    def print_header(self):
-        title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
-        description = self.descriptions[self.description_idx % len(self.descriptions)]
-
-        if self.debug:
-            title_line += f" ({str(self.level.get_state())})"
-
-        print()
-        term_width = self.text_utility.get_term_width()
-        print("=" * term_width)
-        print(
-            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
-            title_line,
-            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
-        )
-        print("=" * term_width)
-        print(
-            " " * self.text_utility.get_horizontal_padding(term_width, description),
-            description,
-            " " * self.text_utility.get_horizontal_padding(term_width, description),
-        )
-        print("-" * term_width)
-        print()
-        print(self.level)
-
-        self.description_idx += 1
-
-    def print_success_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
-        success_msg = self.success_text[self.success_idx % len(self.success_text)]
-        print(self.text_utility.center_text(success_msg))
-        time.sleep(linger_time_s)
-        self.success_idx += 1
-
-    def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
-        fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
-        print(self.text_utility.center_text(fail_msg))
-        time.sleep(linger_time_s)
-        self.fail_idx += 1
-
-    def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
-        fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
-        print(self.text_utility.center_text(fatal_msg))
-        time.sleep(linger_time_s)
-        self.fatal_idx += 1
-
-    def format_song_line(
-        self,
-        notes: t.List[Note],
-        total: int,
-        is_eurydices_turn: bool,
-        eurydice_sum_len: t.Optional[int],
-    ) -> str:
-        values = [str(note.val) for note in notes]
-
-        if is_eurydices_turn:
-            blanks_needed = max((eurydice_sum_len or 0) - len(notes), 0)
-            values.extend("_" for _ in range(blanks_needed))
-
-        if not values:
-            left_side = ""
-        else:
-            left_side = " + ".join(values)
-
-        return f"{left_side} = {total}"
-
-    def print_lyre_prompt(
-            self,
-        ):
-        print()
-
-        lyre_prompts = [
-            "Type the name of a note and press Enter to play it.",
-            "Press X to finish your song.",
-        ]
-
-        for prompt in lyre_prompts:
-            print(prompt)
-
-        print("-" * self.text_utility.get_term_width())
-
-    def read_note(
-        self,
-        notes: t.List[Note],
-        total: int,
-        is_eurydices_turn: t.Optional[bool]=False,
-        eurydice_sum_len: t.Optional[int]=0,
-        warning: t.Optional[str]="",
-    ) -> str:
-        """
-        Keep the repeated interaction small: instead of reprinting the whole
-        level header/state after each submitted note, only print the changing
-        song line as the next input prompt.
-
-        This is intentionally still input()-based. For a truly static live UI
-        where the same terminal row updates in-place while the user types, switch
-        this method to a raw-key reader later.
-        """
-        song_line = self.format_song_line(notes, total, is_eurydices_turn, eurydice_sum_len)
-        return input(f"{song_line}\n{warning}\n> ").strip()
-
-    def run(self):
-        def _graceful_shutdown():
-            self.text_utility.clear_screen()
-            self.text_utility.fade_msg(
-                    "Your song dwindles into nothingness...",
-                    1000,
-                    4,
-                    min_time_in_ms_per_it=250,
-                )
-            time.sleep(1)
-            raise SystemExit(0)
-        
-        def _end_level():            
+    def end_with_look(self):            
             def _force_look_back():
                 demand = "Press any key to look back".upper()
                 self.text_utility.flash_msg(self.text_utility.center_text(line=demand), 1, 3)
@@ -279,6 +178,132 @@ class TextLevel(Level):
 
             self.reset()
             self.run()
+
+    def print_header(self):
+        title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
+        description = self.descriptions[self.description_idx % len(self.descriptions)]
+
+        if self.debug:
+            title_line += f" ({str(self.level.get_state())})"
+
+        print()
+        term_width = self.text_utility.get_term_width()
+        print("=" * term_width)
+        print(
+            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
+            title_line,
+            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
+        )
+        print("=" * term_width)
+        print(
+            " " * self.text_utility.get_horizontal_padding(term_width, description),
+            description,
+            " " * self.text_utility.get_horizontal_padding(term_width, description),
+        )
+        print("-" * term_width)
+        print()
+        print(self.level)
+
+        self.description_idx += 1
+
+    def print_success_msg(self, linger_time_s: t.Optional[int]=3):
+        self.text_utility.clear_screen()
+        print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
+        time.sleep(linger_time_s)
+
+    def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
+        self.text_utility.clear_screen()
+        fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
+        print(self.text_utility.center_text(fail_msg))
+        time.sleep(linger_time_s)
+        self.fail_idx += 1
+
+    def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
+        self.text_utility.clear_screen()
+        fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
+        print(self.text_utility.center_text(fatal_msg))
+        time.sleep(linger_time_s)
+        self.fatal_idx += 1
+
+    def format_song_line(
+        self,
+        notes: t.List[Note],
+        total: int,
+        is_eurydices_turn: bool,
+        eurydice_sum_len: t.Optional[int],
+    ) -> str:
+        values = [str(note.val) for note in notes]
+
+        if is_eurydices_turn:
+            blanks_needed = max((eurydice_sum_len or 0) - len(notes), 0)
+            values.extend("_" for _ in range(blanks_needed))
+
+        if not values:
+            left_side = ""
+        else:
+            left_side = " + ".join(values)
+
+        return f"{left_side} = {total}"
+
+    def print_lyre_prompt(self):
+        print()
+
+        phase_prompts = []
+
+        if self.orpheus_only or \
+            (self.level.state == self.level.LevelState.READY):
+            phase_prompts = self.orpheus_prompts
+
+        if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
+            (self.level.state == self.level.LevelState.EURYDICE_FAIL) or \
+            (self.level.state == self.level.LevelState.EURYDICE_THWARTED):
+            phase_prompts = self.deduction_prompts
+
+        lyre_prompts = [
+            "Type the name of a note and press Enter to play it.",
+            "Press X to finish your song.",
+        ]
+
+        print(phase_prompts[self.phase_prompt_idx % len(phase_prompts)])
+        self.phase_prompt_idx += 1
+        print("-" * len(self.text_utility.get_term_width()))
+
+        for prompt in lyre_prompts:
+            print(prompt)
+
+        print("=" * self.text_utility.get_term_width())
+
+    def read_note(
+        self,
+        notes: t.List[Note],
+        total: int,
+        is_eurydices_turn: t.Optional[bool]=False,
+        eurydice_sum_len: t.Optional[int]=0,
+        warning: t.Optional[str]="",
+    ) -> str:
+        """
+        Keep the repeated interaction small: instead of reprinting the whole
+        level header/state after each submitted note, only print the changing
+        song line as the next input prompt.
+
+        This is intentionally still input()-based. For a truly static live UI
+        where the same terminal row updates in-place while the user types, switch
+        this method to a raw-key reader later.
+        """
+        song_line = self.format_song_line(notes, total, is_eurydices_turn, eurydice_sum_len)
+        return input(f"{song_line}\n{warning}\n> ").strip()
+
+    def run(self):
+        def _graceful_shutdown():
+            self.text_utility.clear_screen()
+            self.text_utility.fade_msg(
+                    "Your song dwindles into nothingness...",
+                    1000,
+                    4,
+                    min_time_in_ms_per_it=250,
+                )
+            time.sleep(1)
+            raise SystemExit(0)
 
         def _accept_notes(
             notes: t.List[Note],
