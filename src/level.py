@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import pathlib
-import sys
 import time
 import typing as t
 
@@ -19,6 +18,7 @@ class TextLevel(Level):
         title: t.Optional[str] = "",
         lyre: t.Optional[Lyre] = None,
         orpheus_goal: t.Optional[Goal] = None,
+        orpheus_only: t.Optional[bool] = False,
         descriptions: t.Optional[t.List[str]] = None,
         success_text: t.Optional[t.List[str]] = None,
         fail_text: t.Optional[t.List[str]] = None,
@@ -34,6 +34,8 @@ class TextLevel(Level):
 
         l = lyre or Lyre()
         og = orpheus_goal or Goal()
+
+        self.orpheus_only = orpheus_only
 
         self.description_idx = 0
         self.success_idx = 0
@@ -61,6 +63,7 @@ class TextLevel(Level):
         title = None
         lyre = None
         orpheus_goal = None
+        orpheus_only = False
         descriptions = None
         success_text = None
         fail_text = None
@@ -92,6 +95,9 @@ class TextLevel(Level):
             if ("orpheus_goal" in data.keys()) and (isinstance(data["orpheus_goal"], int)):
                 orpheus_goal = Goal(data["orpheus_goal"])
 
+            if ("orpheus_only" in data.keys()) and (isinstance(data["orpheus_only"], bool)):
+                orpheus_only = data["orpheus_only"]
+
             if ("descriptions" in data.keys()) and (isinstance(data["descriptions"], list)):
                 descriptions = data["descriptions"]
 
@@ -108,6 +114,7 @@ class TextLevel(Level):
                 title,
                 lyre,
                 orpheus_goal,
+                orpheus_only,
                 descriptions,
                 success_text,
                 fail_text,
@@ -340,44 +347,45 @@ class TextLevel(Level):
 
             self.print_success_msg()
 
-            eurydice_sum_length = self.level.set_eurydice_goal()
-            
-            while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
-                self.level.state == Level.LevelState.EURYDICE_FAIL
-            ):
-                self.level.back_up_lyre()
-                self.level.back_up_rng()
-                print()
-                self.print_lyre_prompt()
-                total, num_notes = _accept_notes(
-                    [],
-                    0,
-                    True,
-                    eurydice_sum_length,
-                )
+            if not self.orpheus_only:
+                eurydice_sum_length = self.level.set_eurydice_goal()
+                
+                while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
+                    self.level.state == Level.LevelState.EURYDICE_FAIL
+                ):
+                    self.level.back_up_lyre()
+                    self.level.back_up_rng()
+                    print()
+                    self.print_lyre_prompt()
+                    total, num_notes = _accept_notes(
+                        [],
+                        0,
+                        True,
+                        eurydice_sum_length,
+                    )
 
-                self.level.check_eurydice(num_notes, total, eurydice_sum_length)
+                    self.level.check_eurydice(num_notes, total, eurydice_sum_length)
 
-                if self.level.state == Level.LevelState.EURYDICE_THWARTED:
-                    self.text_utility.clear_screen()
-                    lines = [
-                        "In your attempts to guide her, you have left Eurydice with no path forward.",
-                        "The gods mercifully restore your lyre so that you may try again.",
-                        "Press any key to continue",
-                    ]
-                    print(self.text_utility.center_text(lines=lines))
+                    if self.level.state == Level.LevelState.EURYDICE_THWARTED:
+                        self.text_utility.clear_screen()
+                        lines = [
+                            "In your attempts to guide her, you have left Eurydice with no path forward.",
+                            "The gods mercifully restore your lyre so that you may try again.",
+                            "Press any key to continue",
+                        ]
+                        print(self.text_utility.center_text(lines=lines))
 
-                    if self.debug:
-                        print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
-                    _ = input()
-                    self.level.resolve_thwart()
-                    continue
+                        if self.debug:
+                            print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
+                        _ = input()
+                        self.level.resolve_thwart()
+                        continue
 
-                if self.level.state == Level.LevelState.EURYDICE_FAIL:
-                    self.print_fail_msg()
-                    continue
+                    if self.level.state == Level.LevelState.EURYDICE_FAIL:
+                        self.print_fail_msg()
+                        continue
 
-            _end_level()
+                _end_level()
         except KeyboardInterrupt:
             _graceful_shutdown()
         except TextLevel.QuitGameException:
