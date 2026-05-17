@@ -65,6 +65,7 @@ class TextLevel(Level):
         success_text: t.Optional[t.List[str]] = None,
         fail_text: t.Optional[t.List[str]] = None,
         fatal_text: t.Optional[t.List[str]] = None,
+        thwart_line: t.Optional[t.Lst[str]] = "In your attempts to guide her, you have left Eurydice with no path forward.",
         debug: t.Optional[bool] = False,
         given_seed: t.Optional[int] = None,
     ) -> None:
@@ -77,6 +78,8 @@ class TextLevel(Level):
         self.success_text = success_text or []
         self.fail_text = fail_text or []
         self.fatal_text = fatal_text or []
+        self.thwart_line = thwart_line or "In your attempts to guide her, you have left Eurydice with no path forward."
+
 
         l = lyre or Lyre()
         og = orpheus_goal or Goal()
@@ -119,6 +122,7 @@ class TextLevel(Level):
         success_text = None
         fail_text = None
         fatal_text = None
+        thwart_line = None
 
         with open(json_path, "r") as f:
             data = json.load(f)
@@ -148,6 +152,9 @@ class TextLevel(Level):
 
             if ("orpheus_only" in data.keys()) and (isinstance(data["orpheus_only"], bool)):
                 orpheus_only = data["orpheus_only"]
+
+            if ("thwart_line" in data.keys()) and (isinstance(data["thwart_line"], str)):
+                thwart_line = data["thwart_line"]
 
             if "challenge" in data.keys():
                 challenge = data["challenge"]
@@ -192,6 +199,7 @@ class TextLevel(Level):
                 fatal_text=fatal_text,
                 debug=debug,
                 given_seed=seed,
+                thwart_line=thwart_line,
             )
 
     def reset(self):
@@ -208,6 +216,13 @@ class TextLevel(Level):
             return self.Phase.DEDUCTION
     
         raise self.Phase.InvalidPhaseException()
+
+    def end(self):
+        if (self.challenge_name != "Eurydice"):
+            self.print_fatal_msg()
+            self.fatal_idx += 1
+        else:
+            self.end_with_look()
 
     def end_with_look(self):            
             def _force_look_back():
@@ -259,12 +274,12 @@ class TextLevel(Level):
                 requirement_line += self.challenge_name
             
             requirement_line += " "
-            requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx]
+            requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
 
             if curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1:
-                requirement_line += requirement_verb.plural
+                requirement_line += requirement_verb.plur()
             else:
-                requirement_line += requirement_verb.singular
+                requirement_line += requirement_verb.sing()
 
             requirement_line += ": "
             
@@ -458,14 +473,15 @@ class TextLevel(Level):
             self.level.try_orpheus(total)
 
             if self.level.state == Level.LevelState.ORPHEUS_FATAL:
-                _end_level()
+                self.end()
                 return
 
             if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
                 print(f"Got unexpected level state {str(self.level.state)}")
                 return
 
-            self.print_success_msg()
+            self.text_utility.clear_screen()
+            self.print_header()
 
             if not self.orpheus_only:
                 eurydice_sum_length = self.level.set_eurydice_goal()
@@ -489,7 +505,7 @@ class TextLevel(Level):
                     if self.level.state == Level.LevelState.EURYDICE_THWARTED:
                         self.text_utility.clear_screen()
                         lines = [
-                            "In your attempts to guide her, you have left Eurydice with no path forward.",
+                            self.thwart_line,
                             "The gods mercifully restore your lyre so that you may try again.",
                             "Press any key to continue",
                         ]
@@ -504,8 +520,8 @@ class TextLevel(Level):
                     if self.level.state == Level.LevelState.EURYDICE_FAIL:
                         self.print_fail_msg()
                         continue
-
-                _end_level()
+                
+                self.end()
         except KeyboardInterrupt:
             _graceful_shutdown()
         except TextLevel.QuitGameException:
