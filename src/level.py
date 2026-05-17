@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 
 import json
 import pathlib
@@ -13,12 +14,51 @@ class TextLevel(Level):
     class QuitGameException(Exception):
         pass
 
+    class Phase(Enum):
+        class InvalidPhaseException(Exception):
+            pass
+
+        ORPHEUS = 0
+        DEDUCTION = 1
+
+    class RequirementVerb():
+        def __init__(
+            self,
+            plural: str,
+            singular: t.Optional[str] = "",
+            preposition: t.Optional[str] = ""
+        ):
+            self.plural = plural
+            self.singular = singular or plural + "s"
+            self.preposition = preposition or ""
+
+        def sing(self) -> str:
+            if len(self.preposition) > 0:
+                return self.singular + " " + self.preposition
+            return self.singular
+
+        def plur(self) -> str:
+            if len(self.preposition) > 0:
+                return self.plural + " " + self.preposition
+            return self.plural
+
+    REQUIREMENT_VERBS = [
+        RequirementVerb("want"),
+        RequirementVerb("need"),
+        RequirementVerb("desire"),
+        RequirementVerb("crave"),
+        RequirementVerb(plural="long", preposition="for"),
+        RequirementVerb(plural="yearn", preposition="for")
+    ]
+
     def __init__(
         self,
         title: t.Optional[str] = "",
         lyre: t.Optional[Lyre] = None,
         orpheus_goal: t.Optional[Goal] = None,
         orpheus_only: t.Optional[bool] = False,
+        challenge_name: t.Optional[str] = "",
+        challenge_number: t.Optional[int] = 1,
         descriptions: t.Optional[t.List[str]] = None,
         orpheus_prompts: t.Optional[t.List[str]] = None,
         deduction_prompts: t.Optional[t.List[str]] = None,
@@ -29,6 +69,8 @@ class TextLevel(Level):
         given_seed: t.Optional[int] = None,
     ) -> None:
         self.title = title or ""
+        self.challenge_name = challenge_name or ""
+        self.challenge_number = challenge_number or 1
         self.descriptions = descriptions or []
         self.deduction_prompts = deduction_prompts or []
         self.orpheus_prompts = orpheus_prompts or []
@@ -45,6 +87,7 @@ class TextLevel(Level):
         self.phase_prompt_idx = 0
         self.fail_idx = 0
         self.fatal_idx = 0
+        self.requirement_verb_idx = 0
 
         self.debug = debug
         db = self.debug  
@@ -68,6 +111,8 @@ class TextLevel(Level):
         lyre = None
         orpheus_goal = None
         orpheus_only = False
+        challenge_name = None
+        challenge_number = None
         descriptions = None
         orpheus_prompts = None
         deduction_prompts = None
@@ -104,6 +149,16 @@ class TextLevel(Level):
             if ("orpheus_only" in data.keys()) and (isinstance(data["orpheus_only"], bool)):
                 orpheus_only = data["orpheus_only"]
 
+            if "challenge" in data.keys():
+                challenge = data["challenge"]
+
+                if len(challenge.keys()) > 0:
+                    if ("name" in challenge.keys()) and (isinstance(challenge["name"], str)):
+                        challenge_name = challenge["name"]
+                    
+                    if ("number" in challenge.keys()) and (isinstance(challenge["number"], int)):
+                        challenge_number = challenge["number"]
+
             if ("descriptions" in data.keys()) and (isinstance(data["descriptions"], list)):
                 descriptions = data["descriptions"]
 
@@ -123,22 +178,36 @@ class TextLevel(Level):
                 fatal_text = data["fatal_text"]
 
             return TextLevel(
-                title,
-                lyre,
-                orpheus_goal,
-                orpheus_only,
-                descriptions,
-                orpheus_prompts,
-                deduction_prompts,
-                success_text,
-                fail_text,
-                fatal_text,
-                debug,
-                seed,
+                title=title,
+                lyre=lyre,
+                orpheus_goal=orpheus_goal,
+                orpheus_only=orpheus_only,
+                challenge_name=challenge_name,
+                challenge_number=challenge_number,
+                descriptions=descriptions,
+                orpheus_prompts=orpheus_prompts,
+                deduction_prompts=deduction_prompts,
+                success_text=success_text,
+                fail_text=fail_text,
+                fatal_text=fatal_text,
+                debug=debug,
+                given_seed=seed,
             )
 
     def reset(self):
         self.level.reset()
+
+    def phase(self) -> Phase:
+        if self.orpheus_only or \
+            (self.level.state == self.level.LevelState.READY):
+            return self.Phase.ORPHEUS
+
+        if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
+            (self.level.state == self.level.LevelState.EURYDICE_FAIL) or \
+            (self.level.state == self.level.LevelState.EURYDICE_THWARTED):
+            return self.Phase.DEDUCTION
+    
+        raise self.Phase.InvalidPhaseException()
 
     def end_with_look(self):            
             def _force_look_back():
@@ -180,6 +249,33 @@ class TextLevel(Level):
             self.run()
 
     def print_header(self):
+        def _print_requirement():
+            curr_phase = self.phase()
+            requirement_line = ""
+
+            if curr_phase == self.Phase.ORPHEUS:
+                requirement_line += "Orpheus" 
+            elif curr_phase == self.Phase.DEDUCTION:
+                requirement_line += self.challenge_name
+            
+            requirement_line += " "
+            requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx]
+
+            if curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1:
+                requirement_line += requirement_verb.plural
+            else:
+                requirement_line += requirement_verb.singular
+
+            requirement_line += ": "
+            
+            if curr_phase == self.Phase.ORPHEUS:
+                requirement_line += str(self.level.orpheus_goal.val)
+            elif curr_phase == self.Phase.DEDUCTION:
+                requirement_line += "?"
+            
+            print(requirement_line)
+            self.requirement_verb_idx += 1
+
         title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
@@ -203,6 +299,8 @@ class TextLevel(Level):
         print("-" * term_width)
         print()
         print(self.level)
+        print()
+        _print_requirement()
 
         self.description_idx += 1
 
@@ -250,13 +348,10 @@ class TextLevel(Level):
 
         phase_prompts = []
 
-        if self.orpheus_only or \
-            (self.level.state == self.level.LevelState.READY):
+        if self.phase() == self.Phase.ORPHEUS:
             phase_prompts = self.orpheus_prompts
 
-        if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
-            (self.level.state == self.level.LevelState.EURYDICE_FAIL) or \
-            (self.level.state == self.level.LevelState.EURYDICE_THWARTED):
+        if self.phase() == self.Phase.DEDUCTION:
             phase_prompts = self.deduction_prompts
 
         lyre_prompts = [
@@ -266,7 +361,7 @@ class TextLevel(Level):
 
         print(phase_prompts[self.phase_prompt_idx % len(phase_prompts)])
         self.phase_prompt_idx += 1
-        print("-" * len(self.text_utility.get_term_width()))
+        print("-" * self.text_utility.get_term_width())
 
         for prompt in lyre_prompts:
             print(prompt)
