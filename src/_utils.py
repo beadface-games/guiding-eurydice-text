@@ -79,7 +79,6 @@ class TextUtility:
         usable_width = max(width, 20)
         wrapped: t.List[str] = []
 
-        print("wrapped")
         for line in lines:
             print(line)
             if line == "":
