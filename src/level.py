@@ -6,9 +6,13 @@ import pathlib
 import time
 import typing as t
 
+from guiding_eurydice_core.src.difficulty import Difficulty
 from guiding_eurydice_core.src.lyre import Lyre, Note
 from guiding_eurydice_core.src.level import Goal, Level
-from src._utils import TextUtility
+from src._utils import RequirementVerb, TextUtility
+
+DIFFICULTY_JSON_PATH = pathlib.Path("guiding_eurydice_levels/difficulty_settings.json")
+
 
 class TextLevel(Level):
     class QuitGameException(Exception):
@@ -20,27 +24,6 @@ class TextLevel(Level):
 
         ORPHEUS = 0
         DEDUCTION = 1
-
-    class RequirementVerb():
-        def __init__(
-            self,
-            plural: str,
-            singular: t.Optional[str] = "",
-            preposition: t.Optional[str] = ""
-        ):
-            self.plural = plural
-            self.singular = singular or plural + "s"
-            self.preposition = preposition or ""
-
-        def sing(self) -> str:
-            if len(self.preposition) > 0:
-                return self.singular + " " + self.preposition
-            return self.singular
-
-        def plur(self) -> str:
-            if len(self.preposition) > 0:
-                return self.plural + " " + self.preposition
-            return self.plural
 
     REQUIREMENT_VERBS = [
         RequirementVerb("want"),
@@ -55,6 +38,7 @@ class TextLevel(Level):
         self,
         title: t.Optional[str] = "",
         lyre: t.Optional[Lyre] = None,
+        difficulty: t.Optional[Difficulty] = None,
         orpheus_goal: t.Optional[Goal] = None,
         orpheus_only: t.Optional[bool] = False,
         challenge_name: t.Optional[str] = "",
@@ -70,6 +54,7 @@ class TextLevel(Level):
         given_seed: t.Optional[int] = None,
     ) -> None:
         self.title = title or ""
+        self.difficulty = difficulty or Difficulty()
         self.challenge_name = challenge_name or ""
         self.challenge_number = challenge_number or 1
         self.descriptions = descriptions or []
@@ -93,16 +78,18 @@ class TextLevel(Level):
         self.requirement_verb_idx = 0
 
         self.debug = debug
-        db = self.debug  
 
         self.level = Level(
             l,
             og,
-            db,
+            self.debug,
             given_seed,
         )   
 
-        self.text_utility = TextUtility(rng=self.level.rng)
+        self.text_utility = TextUtility(
+            rng=self.level.rng,
+            debug=self.debug,
+        )
 
     @staticmethod
     def from_json(
@@ -111,6 +98,7 @@ class TextLevel(Level):
         seed: t.Optional[int] = None,
     ) -> TextLevel:
         title = None
+        difficulty = None
         lyre = None
         orpheus_goal = None
         orpheus_only = False
@@ -129,9 +117,12 @@ class TextLevel(Level):
 
             if ("title" in data.keys()) and (isinstance(data["title"], str)):
                 title = data["title"]
+            
+            if ("difficulty" in data.keys()) and (isinstance(data["difficulty"], int)):
+                difficulty = Difficulty.from_json(data["difficulty"], DIFFICULTY_JSON_PATH)
 
             if ("lyre" in data.keys()) and (isinstance(data["lyre"], list)):
-                d: t.Dict[Note, int] = {}
+                notes: list[int] = []
                 for item in data["lyre"]:
                     if (isinstance(item, dict)) and ("note" in item.keys()):
                         n = item["note"]
@@ -142,10 +133,14 @@ class TextLevel(Level):
                             and "val" in n.keys()
                             and isinstance(n["val"], int)
                         ):
-                            note = Note(name=n["name"], val=n["val"])
-                            d[note] = item["count"] if "count" in item.keys() else 1
+                            count = 1
+                            if ("count" in n.keys()) and (isinstance(n["count"], int)):
+                                count = n["count"]
 
-                lyre = Lyre(d)
+                            note = Note(name=n["name"], val=n["val"], count=count)
+                            notes.append(note)
+
+                lyre = Lyre(notes)
 
             if ("orpheus_goal" in data.keys()) and (isinstance(data["orpheus_goal"], int)):
                 orpheus_goal = Goal(data["orpheus_goal"])
@@ -187,6 +182,7 @@ class TextLevel(Level):
             return TextLevel(
                 title=title,
                 lyre=lyre,
+                difficulty=difficulty,
                 orpheus_goal=orpheus_goal,
                 orpheus_only=orpheus_only,
                 challenge_name=challenge_name,
@@ -203,8 +199,7 @@ class TextLevel(Level):
             )
 
     def print(self):
-        if (not self.debug):
-            self.text_utility.clear_screen()
+        self.text_utility.clear_screen()
         self.print_header()
         self.print_lyre_prompt()
         self.print_requirement()
@@ -350,22 +345,19 @@ class TextLevel(Level):
         self.description_idx += 1
 
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
-        if not self.debug:
-            self.text_utility.clear_screen()
+        self.text_utility.clear_screen()
         print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
         time.sleep(linger_time_s)
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
-        if not self.debug:
-            self.text_utility.clear_screen()
+        self.text_utility.clear_screen()
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
         print(self.text_utility.center_text(fail_msg))
         time.sleep(linger_time_s)
         self.fail_idx += 1
 
     def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
-        if not self.debug:
-            self.text_utility.clear_screen()
+        self.text_utility.clear_screen()
         fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
         print(self.text_utility.center_text(fatal_msg))
         time.sleep(linger_time_s)
@@ -518,8 +510,7 @@ class TextLevel(Level):
                     self.level.check_eurydice(num_notes, total, eurydice_sum_length)
 
                     if self.level.state == Level.LevelState.EURYDICE_THWARTED:
-                        if not self.debug:
-                            self.text_utility.clear_screen()
+                        self.text_utility.clear_screen()
                         lines = [
                             self.thwart_line,
                             "The gods mercifully restore your lyre so that you may try again.",
