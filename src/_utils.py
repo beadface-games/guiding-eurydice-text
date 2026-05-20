@@ -4,12 +4,35 @@ import textwrap
 import time
 import typing as t
 
+class RequirementVerb():
+        def __init__(
+            self,
+            plural: str,
+            singular: t.Optional[str] = "",
+            preposition: t.Optional[str] = ""
+        ):
+            self.plural = plural
+            self.singular = singular or plural + "s"
+            self.preposition = preposition or ""
+
+        def sing(self) -> str:
+            if len(self.preposition) > 0:
+                return self.singular + " " + self.preposition
+            return self.singular
+
+        def plur(self) -> str:
+            if len(self.preposition) > 0:
+                return self.plural + " " + self.preposition
+            return self.plural
+
 class TextUtility:
     def __init__(
         self,
-        rng=random.Random,
+        rng: t.Optional[random.Random] = random.Random(),
+        debug:t.Optional[bool]=False,
     ):
         self.rng = rng
+        self.debug = debug        
 
     def get_term_width(self) -> int:
         return shutil.get_terminal_size(fallback=(80, 24)).columns
@@ -61,7 +84,8 @@ class TextUtility:
     def clear_screen(self):
         # ANSI clear screen + move cursor home. Works in modern Windows Terminal,
         # PowerShell, Git Bash, macOS Terminal, and most Linux terminals.
-        print("\033[2J\033[H", end="")
+        if not self.debug:
+            print("\033[2J\033[H", end="")
 
     def clear_lines(self, n: int):
       for _ in range(n):
@@ -178,12 +202,15 @@ class TextUtility:
         time_in_s: float,
         iterations: int
     ):
-        for _ in range(iterations):
-            self.clear_screen()
-            print()
-            time.sleep(time_in_s)
+        if not self.debug:
+            for _ in range(iterations):
+                self.clear_screen()
+                print()
+                time.sleep(time_in_s)
+                print(msg)
+                time.sleep(time_in_s)
+        else:
             print(msg)
-            time.sleep(time_in_s)
 
     def fade_msg(
         self,
@@ -213,33 +240,36 @@ class TextUtility:
             
             return res
         
-        self.clear_screen()
-        fade_msgs = _get_fade_msgs()
-        if center_horizontally:
-            print(
-                self.center_text(
-                    msg,
-                    None,
-                    None,
-                    center_vertically,
-                )
-            )
-        else:
-            print(msg)
-        time.sleep(max_time_in_ms_per_it / 1000)
-
-        for s, ms in fade_msgs.items():
+        if not self.debug:
             self.clear_screen()
+            fade_msgs = _get_fade_msgs()
             if center_horizontally:
                 print(
                     self.center_text(
-                    s,
-                    None,
-                    None,
-                    center_vertically,
+                        msg,
+                        None,
+                        None,
+                        center_vertically,
                     )
                 )
             else:
-                print(s)
-            time.sleep(ms)
+                print(msg)
+            time.sleep(max_time_in_ms_per_it / 1000)
+
+            for s, ms in fade_msgs.items():
+                self.clear_screen()
+                if center_horizontally:
+                    print(
+                        self.center_text(
+                        s,
+                        None,
+                        None,
+                        center_vertically,
+                        )
+                    )
+                else:
+                    print(s)
+                time.sleep(ms)
+        else:
+            print(msg)
 
