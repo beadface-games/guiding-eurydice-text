@@ -67,6 +67,7 @@ class TextLevel(Level):
 
 
         l = lyre or Lyre()
+
         og = orpheus_goal or Goal()
 
         self.orpheus_only = orpheus_only
@@ -80,10 +81,11 @@ class TextLevel(Level):
         self.debug = debug
 
         self.level = Level(
-            l,
-            og,
-            self.debug,
-            given_seed,
+            lyre=l,
+            difficulty=self.difficulty,
+            orpheus_goal=og,
+            debug=self.debug,
+            given_seed=given_seed,
         )   
 
         self.text_utility = TextUtility(
@@ -91,6 +93,20 @@ class TextLevel(Level):
             debug=self.debug,
         )
 
+        if self.debug:
+            print("CREATED NEW TEXT LEVEL")
+            print(f"title: {self.title}")
+            print(f"difficulty: {str(self.difficulty)}")
+            print(f"challenge name: {self.challenge_name}")
+            print(f"challenge number: f{str(self.challenge_number)}")
+            print(f"orpheus goal: {str(self.level.orpheus_goal)}")
+            print(f"descriptions (len): {str(len(self.descriptions))}")
+            print(f"deduction prompts (len): {str(len(self.deduction_prompts))}")
+            print(f"orpheus prompts (len): {str(len(self.orpheus_prompts))}")
+            print(f"success text (len): {str(len(self.success_text))}")
+            print(f"fail text: {str(len(self.fail_text))}")
+            print(f"fatal text (len): {str(len(self.fatal_text))}")
+            print(f"thwart line: {self.thwart_line}")
     @staticmethod
     def from_json(
         json_path: pathlib.Path,
@@ -140,7 +156,11 @@ class TextLevel(Level):
                             note = Note(name=n["name"], val=n["val"], count=count)
                             notes.append(note)
 
-                lyre = Lyre(notes)
+                lyre = Lyre(
+                    notes=notes,
+                    debug=debug,
+                    difficulty=difficulty,
+                )
 
             if ("orpheus_goal" in data.keys()) and (isinstance(data["orpheus_goal"], int)):
                 orpheus_goal = Goal(data["orpheus_goal"])
@@ -458,6 +478,7 @@ class TextLevel(Level):
                     notes.append(note)
                     total += note.val
 
+                self.print()
                 i = self.read_note(
                     notes,
                     total,
