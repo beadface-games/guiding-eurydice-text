@@ -202,6 +202,13 @@ class TextLevel(Level):
                 thwart_line=thwart_line,
             )
 
+    def print(self):
+        if (not self.debug):
+            self.text_utility.clear_screen()
+        self.print_header()
+        self.print_lyre_prompt()
+        self.print_requirement()
+
     def reset(self):
         self.level.reset()
 
@@ -216,8 +223,32 @@ class TextLevel(Level):
             return self.Phase.DEDUCTION
     
         raise self.Phase.InvalidPhaseException()
+    
+    def graceful_shutdown(self):
+        self.text_utility.clear_screen()
+        self.text_utility.fade_msg(
+                "Your song dwindles into nothingness...",
+                1000,
+                4,
+                min_time_in_ms_per_it=250,
+            )
+        time.sleep(1)
+        raise SystemExit(0)
+    
+    def quit_or_try_again(self):
+        print("Press Q to quit. Press any other key to try again.")
+
+        i = input().strip()
+        if i.upper() == "Q":
+            self.graceful_shutdown()
+
+        self.reset()
+        self.run()
 
     def end(self):
+        if self.level.state == Level.LevelState.SUCCESS:
+            return
+        
         if (self.challenge_name != "Eurydice"):
             self.print_fatal_msg()
             self.fatal_idx += 1
@@ -242,9 +273,6 @@ class TextLevel(Level):
                 ]
 
                 print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(demise_strs)))
-
-            if self.level.state == Level.LevelState.SUCCESS:
-                return
             
             if self.level.state == Level.LevelState.ORPHEUS_FATAL:
                 self.print_fatal_msg()
@@ -253,51 +281,57 @@ class TextLevel(Level):
             elif self.level.state == Level.LevelState.EURYDICE_FATAL:
                 print("Eurydice is lost.")
                 _force_look_back()
+            
+            self.quit_or_try_again()
 
-            print("Press Q to quit. Press any other key to try again.")
+    def end_with_broken_string(
+        self,
+        broken_string: Note,        
+    ):
+        self.text_utility.clear_screen()
+        print(self.text_utility.center_text(
+            lines=[
+                f"Your {broken_string.name} string snaps with a discordant twang.",
+                "Without your lyre, you cannot go on."
+            ]
+        ))
 
-            i = input().strip()
-            if i.upper() == "Q":
-                return
+        self.quit_or_try_again()
 
-            self.reset()
-            self.run()
+    def print_requirement(self):
+        curr_phase = self.phase()
+        requirement_line = ""
+
+        if curr_phase == self.Phase.ORPHEUS:
+            requirement_line += "Orpheus" 
+        elif curr_phase == self.Phase.DEDUCTION:
+            requirement_line += self.challenge_name
+        
+        requirement_line += " "
+        requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
+
+        if curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1:
+            requirement_line += requirement_verb.plur()
+        else:
+            requirement_line += requirement_verb.sing()
+
+        requirement_line += ": "
+        
+        if curr_phase == self.Phase.ORPHEUS:
+            requirement_line += str(self.level.orpheus_goal.val)
+        elif curr_phase == self.Phase.DEDUCTION:
+            requirement_line += "?"
+        
+        print(requirement_line)
+        self.requirement_verb_idx += 1
 
     def print_header(self):
-        def _print_requirement():
-            curr_phase = self.phase()
-            requirement_line = ""
-
-            if curr_phase == self.Phase.ORPHEUS:
-                requirement_line += "Orpheus" 
-            elif curr_phase == self.Phase.DEDUCTION:
-                requirement_line += self.challenge_name
-            
-            requirement_line += " "
-            requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
-
-            if curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1:
-                requirement_line += requirement_verb.plur()
-            else:
-                requirement_line += requirement_verb.sing()
-
-            requirement_line += ": "
-            
-            if curr_phase == self.Phase.ORPHEUS:
-                requirement_line += str(self.level.orpheus_goal.val)
-            elif curr_phase == self.Phase.DEDUCTION:
-                requirement_line += "?"
-            
-            print(requirement_line)
-            self.requirement_verb_idx += 1
-
         title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
             title_line += f" ({str(self.level.get_state())})"
 
-        print()
         term_width = self.text_utility.get_term_width()
         print("=" * term_width)
         print(
@@ -312,27 +346,26 @@ class TextLevel(Level):
             " " * self.text_utility.get_horizontal_padding(term_width, description),
         )
         print("-" * term_width)
-        print()
         print(self.level)
-        print()
-        _print_requirement()
-
         self.description_idx += 1
 
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
+        if not self.debug:
+            self.text_utility.clear_screen()
         print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
         time.sleep(linger_time_s)
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
+        if not self.debug:
+            self.text_utility.clear_screen()
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
         print(self.text_utility.center_text(fail_msg))
         time.sleep(linger_time_s)
         self.fail_idx += 1
 
     def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
+        if not self.debug:
+            self.text_utility.clear_screen()
         fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
         print(self.text_utility.center_text(fatal_msg))
         time.sleep(linger_time_s)
@@ -359,8 +392,6 @@ class TextLevel(Level):
         return f"{left_side} = {total}"
 
     def print_lyre_prompt(self):
-        print()
-
         phase_prompts = []
 
         if self.phase() == self.Phase.ORPHEUS:
@@ -369,17 +400,13 @@ class TextLevel(Level):
         if self.phase() == self.Phase.DEDUCTION:
             phase_prompts = self.deduction_prompts
 
-        lyre_prompts = [
-            "Type the name of a note and press Enter to play it.",
-            "Press X to finish your song.",
-        ]
+        lyre_prompt = "Type the name of a note and press Enter to play it. Press X to finish your song."
 
         print(phase_prompts[self.phase_prompt_idx % len(phase_prompts)])
         self.phase_prompt_idx += 1
         print("-" * self.text_utility.get_term_width())
 
-        for prompt in lyre_prompts:
-            print(prompt)
+        print(lyre_prompt)
 
         print("=" * self.text_utility.get_term_width())
 
@@ -404,26 +431,13 @@ class TextLevel(Level):
         return input(f"{song_line}\n{warning}\n> ").strip()
 
     def run(self):
-        def _graceful_shutdown():
-            self.text_utility.clear_screen()
-            self.text_utility.fade_msg(
-                    "Your song dwindles into nothingness...",
-                    1000,
-                    4,
-                    min_time_in_ms_per_it=250,
-                )
-            time.sleep(1)
-            raise SystemExit(0)
-
         def _accept_notes(
             notes: t.List[Note],
             total: int,
             is_eurydices_turn: t.Optional[bool] = False,
             eurydice_sum_len: t.Optional[int] = 0,
         ) -> t.Tuple[int, int]:
-            self.text_utility.clear_screen()
-            self.print_header()
-            self.print_lyre_prompt()
+            self.print()
             i = self.read_note(
                 notes,
                 total,
@@ -437,21 +451,21 @@ class TextLevel(Level):
                 warning = ""
 
                 try:
-                    self.level.lyre.play_note(i)
+                    note = self.level.lyre.play_note(i)
                 except Lyre.NoSuchNoteException:
                     warning = "Your lyre has no such string."
                     skip = True
                 except Lyre.NoteDepletedException:
                     warning = "You can't play that note anymore."
                     skip = True
+                except Lyre.BrokenStringException:
+                    self.end_with_broken_string(note)
+                    skip = True
 
                 if not skip:
                     notes.append(note)
                     total += note.val
 
-                self.text_utility.clear_screen()
-                self.print_header()
-                self.print_lyre_prompt()
                 i = self.read_note(
                     notes,
                     total,
@@ -465,10 +479,10 @@ class TextLevel(Level):
 
             return total, len(notes)
 
-        try:
-            self.print_header()
-            self.print_lyre_prompt()
-        
+        try:        
+            if self.debug:
+                print("Entering Orpheus phase...")
+
             total, _ = _accept_notes([], 0)
             self.level.try_orpheus(total)
 
@@ -480,19 +494,20 @@ class TextLevel(Level):
                 print(f"Got unexpected level state {str(self.level.state)}")
                 return
 
-            self.text_utility.clear_screen()
-            self.print_header()
-
             if not self.orpheus_only:
                 eurydice_sum_length = self.level.set_eurydice_goal()
+
+                if self.debug:
+                    print(f"Set Eurydice's goal to {self.level.eurydice_goal.val} ({eurydice_sum_length} addends)")
                 
                 while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
                     self.level.state == Level.LevelState.EURYDICE_FAIL
                 ):
+                    if self.debug:
+                        print(f"Level state is {str(self.level.state)}. Beginning deduction phase.")
+
                     self.level.back_up_lyre()
                     self.level.back_up_rng()
-                    print()
-                    self.print_lyre_prompt()
                     total, num_notes = _accept_notes(
                         [],
                         0,
@@ -503,7 +518,8 @@ class TextLevel(Level):
                     self.level.check_eurydice(num_notes, total, eurydice_sum_length)
 
                     if self.level.state == Level.LevelState.EURYDICE_THWARTED:
-                        self.text_utility.clear_screen()
+                        if not self.debug:
+                            self.text_utility.clear_screen()
                         lines = [
                             self.thwart_line,
                             "The gods mercifully restore your lyre so that you may try again.",
@@ -523,6 +539,6 @@ class TextLevel(Level):
                 
                 self.end()
         except KeyboardInterrupt:
-            _graceful_shutdown()
+            self.graceful_shutdown()
         except TextLevel.QuitGameException:
-            _graceful_shutdown()
+            self.graceful_shutdown()
