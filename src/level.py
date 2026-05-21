@@ -107,6 +107,7 @@ class TextLevel(Level):
             print(f"fail text: {str(len(self.fail_text))}")
             print(f"fatal text (len): {str(len(self.fatal_text))}")
             print(f"thwart line: {self.thwart_line}")
+
     @staticmethod
     def from_json(
         json_path: pathlib.Path,
@@ -221,6 +222,7 @@ class TextLevel(Level):
     def print(self):
         self.text_utility.clear_screen()
         self.print_header()
+        self.print_lyre()
         self.print_lyre_prompt()
         self.print_requirement()
 
@@ -251,7 +253,7 @@ class TextLevel(Level):
         raise SystemExit(0)
     
     def quit_or_try_again(self):
-        print("Press Q to quit. Press any other key to try again.")
+        print("Press Q + <Enter> to quit. Press <Enter> to try again.")
 
         i = input().strip()
         if i.upper() == "Q":
@@ -267,6 +269,7 @@ class TextLevel(Level):
         if (self.challenge_name != "Eurydice"):
             self.print_fatal_msg()
             self.fatal_idx += 1
+            self.quit_or_try_again()
         else:
             self.end_with_look()
 
@@ -340,7 +343,10 @@ class TextLevel(Level):
         print(requirement_line)
         self.requirement_verb_idx += 1
 
-    def print_header(self):
+    def print_header(
+            self,
+            omit_description: t.Optional[bool] = False,
+        ):
         title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
@@ -355,14 +361,18 @@ class TextLevel(Level):
             " " * self.text_utility.get_horizontal_padding(term_width, title_line),
         )
         print("=" * term_width)
-        print(
-            " " * self.text_utility.get_horizontal_padding(term_width, description),
-            description,
-            " " * self.text_utility.get_horizontal_padding(term_width, description),
-        )
-        print("-" * term_width)
+
+        if not omit_description:
+            print(
+                " " * self.text_utility.get_horizontal_padding(term_width, description),
+                description,
+                " " * self.text_utility.get_horizontal_padding(term_width, description),
+            )
+            print("-" * term_width)
+            self.description_idx += 1
+
+    def print_lyre(self):
         print(self.level)
-        self.description_idx += 1
 
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
         self.text_utility.clear_screen()
@@ -403,23 +413,27 @@ class TextLevel(Level):
 
         return f"{left_side} = {total}"
 
-    def print_lyre_prompt(self):
-        phase_prompts = []
+    def print_lyre_prompt(
+        self,
+        omit_phase: t.Optional[bool] = False
+    ):
 
-        if self.phase() == self.Phase.ORPHEUS:
-            phase_prompts = self.orpheus_prompts
+        if not omit_phase:
+            phase_prompts = []
 
-        if self.phase() == self.Phase.DEDUCTION:
-            phase_prompts = self.deduction_prompts
+            if self.phase() == self.Phase.ORPHEUS:
+                phase_prompts = self.orpheus_prompts
+
+            if self.phase() == self.Phase.DEDUCTION:
+                phase_prompts = self.deduction_prompts
+
+            print(phase_prompts[self.phase_prompt_idx % len(phase_prompts)])
+            self.phase_prompt_idx += 1
+            print("-" * self.text_utility.get_term_width())
 
         lyre_prompt = "Type the name of a note and press Enter to play it. Press X to finish your song."
 
-        print(phase_prompts[self.phase_prompt_idx % len(phase_prompts)])
-        self.phase_prompt_idx += 1
-        print("-" * self.text_utility.get_term_width())
-
         print(lyre_prompt)
-
         print("=" * self.text_utility.get_term_width())
 
     def read_note(
@@ -442,7 +456,11 @@ class TextLevel(Level):
         song_line = self.format_song_line(notes, total, is_eurydices_turn, eurydice_sum_len)
         return input(f"{song_line}\n{warning}\n> ").strip()
 
-    def run(self):
+    def run(
+        self,
+        orpheus_tutorial: t.Optional[bool] = False,
+        deduction_tutorial: t.Optional[bool] = False,
+    ):
         def _accept_notes(
             notes: t.List[Note],
             total: int,
@@ -492,9 +510,10 @@ class TextLevel(Level):
 
             return total, len(notes)
 
-        try:        
+        try:  
+            # ORPHEUS PHASE      
             if self.debug:
-                print("Entering Orpheus phase...")
+                print("Entering Orpheus phase...")             
 
             total, _ = _accept_notes([], 0)
             self.level.try_orpheus(total)
@@ -535,7 +554,7 @@ class TextLevel(Level):
                         lines = [
                             self.thwart_line,
                             "The gods mercifully restore your lyre so that you may try again.",
-                            "Press any key to continue",
+                            "Press <Enter> to continue",
                         ]
                         print(self.text_utility.center_text(lines=lines))
 
@@ -548,7 +567,11 @@ class TextLevel(Level):
                     if self.level.state == Level.LevelState.EURYDICE_FAIL:
                         self.print_fail_msg()
                         continue
-                
+            if orpheus_tutorial:
+                print(self.text_utility.center_text("Nice work. You're ready for the hard part."))
+                _ = input("Press <Enter> to continue.")
+                return True
+            else:
                 self.end()
         except KeyboardInterrupt:
             self.graceful_shutdown()

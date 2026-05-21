@@ -104,7 +104,6 @@ class TextUtility:
         wrapped: t.List[str] = []
 
         for line in lines:
-            print(line)
             if line == "":
                 wrapped.append("")
                 continue
@@ -137,7 +136,9 @@ class TextUtility:
         self,
         line: t.Optional[str] = None,
         lines: t.Optional[t.List[str]] = None,
+        multi_lines: t.Optional[t.List[t.List[str]]] = None,
         max_width: t.Optional[int] = None,
+        horizontal: bool = True,
         vertical: bool = True,
     ) -> str:
         """
@@ -147,31 +148,59 @@ class TextUtility:
         - Long lines are wrapped before centering
         - Uses terminal-size fallback so redirected output/tests don't crash
         """
-        if line is not None and lines is not None:
+        if (line is not None and lines is not None) or \
+            (line is not None and multi_lines is not None) or \
+            (lines is not None and multi_lines is not None):
             raise ValueError("Pass either line or lines, not both.")
 
-        if line is None and lines is None:
+        if line is None and lines is None and multi_lines is None:
             return ""
 
-        raw_lines = [line] if line is not None else list(lines or [])
 
         term_width = self.get_term_width()
         term_height = self.get_term_height()
 
-        rendered_lines = self.wrap_lines(raw_lines, self.get_content_width(max_width))
+        if line is not None or lines is not None:
+            raw_lines = [line] if line is not None else list(lines or [])
 
-        top_padding = self.get_vertical_padding(term_height, rendered_lines) if vertical else 0
+            rendered_lines = self.wrap_lines(raw_lines, self.get_content_width(max_width))
 
-        output_lines: t.List[str] = []
-        output_lines.extend("" for _ in range(top_padding))
+            top_padding = self.get_vertical_padding(term_height, rendered_lines) if vertical else 0
 
-        for rendered_line in rendered_lines:
-            left_padding = self.get_horizontal_padding(term_width, rendered_line)
-            output_lines.append((" " * left_padding) + rendered_line)
+            output_lines: t.List[str] = []
+            output_lines.extend("" for _ in range(top_padding))
 
-        output_lines.extend("" for _ in range(top_padding))
+            for rendered_line in rendered_lines:
+                left_padding = self.get_horizontal_padding(term_width, rendered_line) if horizontal else 0
+                output_lines.append((" " * left_padding) + rendered_line)
 
-        return "\n".join(output_lines)
+            output_lines.extend("" for _ in range(top_padding))
+
+            return "\n".join(output_lines)
+        elif (multi_lines is not None):
+            total_height = 0
+            rendered_line_groups = []
+            for lines in multi_lines:
+                rendered_lines = self.wrap_lines(lines, self.get_content_width(max_width))
+                rendered_line_groups.append(rendered_lines)
+                total_height += len(rendered_lines)
+            
+            in_between_padding = (term_height - total_height) // (len(multi_lines) - 1)
+
+            res = ""
+
+            for i, line_group in enumerate(rendered_line_groups):
+                res += "\n".join(line_group)
+
+                if (i < (len(rendered_line_groups) - 1)):
+                    res += "\n" * in_between_padding
+            return res
+        
+    def get_all_but_last_line_padding(
+        self,
+        lines: t.List[str],
+    ) -> int:
+        return self.get_term_height() - len(lines) - 5
     
     def boxify_lines(
         self,
@@ -272,4 +301,4 @@ class TextUtility:
                 time.sleep(ms)
         else:
             print(msg)
-
+        
