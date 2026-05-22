@@ -25,6 +25,15 @@ class TextLevel(Level):
         ORPHEUS = 0
         DEDUCTION = 1
 
+    class TutorialPhase(Enum):
+        class InvalidPhaseException(Exception):
+            pass
+
+        NO_TUT = 0
+        ORPHEUS_ONLY = 1
+        DEDUCTION_START = 2
+        DEDUCTION_END = 3
+
     REQUIREMENT_VERBS = [
         RequirementVerb("want"),
         RequirementVerb("need"),
@@ -36,6 +45,7 @@ class TextLevel(Level):
 
     def __init__(
         self,
+        id: t.Optional[int] = None,
         title: t.Optional[str] = "",
         lyre: t.Optional[Lyre] = None,
         difficulty: t.Optional[Difficulty] = None,
@@ -49,10 +59,12 @@ class TextLevel(Level):
         success_text: t.Optional[t.List[str]] = None,
         fail_text: t.Optional[t.List[str]] = None,
         fatal_text: t.Optional[t.List[str]] = None,
-        thwart_line: t.Optional[t.Lst[str]] = "In your attempts to guide her, you have left Eurydice with no path forward.",
+        thwart_line: t.Optional[t.List[str]] = "In your attempts to guide her, you have left Eurydice with no path forward.",
         debug: t.Optional[bool] = False,
         given_seed: t.Optional[int] = None,
     ) -> None:
+        print("received id", id)
+        self.id = id or None
         self.title = title or ""
         self.difficulty = difficulty or Difficulty()
         self.challenge_name = challenge_name or ""
@@ -80,7 +92,12 @@ class TextLevel(Level):
 
         self.debug = debug
 
+        if self.debug:
+            print("Inside TextLevel constructor")
+            print("self id is", self.id)
+
         self.level = Level(
+            id=self.id,
             lyre=l,
             difficulty=self.difficulty,
             orpheus_goal=og,
@@ -95,6 +112,7 @@ class TextLevel(Level):
 
         if self.debug:
             print("CREATED NEW TEXT LEVEL")
+            print(f"id: {self.id}")
             print(f"title: {self.title}")
             print(f"difficulty: {str(self.difficulty)}")
             print(f"challenge name: {self.challenge_name}")
@@ -107,6 +125,8 @@ class TextLevel(Level):
             print(f"fail text: {str(len(self.fail_text))}")
             print(f"fatal text (len): {str(len(self.fatal_text))}")
             print(f"thwart line: {self.thwart_line}")
+            print(f"level id: {self.level.id}")
+            print(f"level: {str(self.level)}")
 
     @staticmethod
     def from_json(
@@ -114,6 +134,7 @@ class TextLevel(Level):
         debug: t.Optional[bool] = False,
         seed: t.Optional[int] = None,
     ) -> TextLevel:
+        id = None
         title = None
         difficulty = None
         lyre = None
@@ -129,8 +150,14 @@ class TextLevel(Level):
         fatal_text = None
         thwart_line = None
 
+        if debug:
+            print("Creating text level from JSON")
+
         with open(json_path, "r") as f:
             data = json.load(f)
+
+            if ("id" in data.keys()) and (isinstance(data["id"], int)):
+                id = data["id"]
 
             if ("title" in data.keys()) and (isinstance(data["title"], str)):
                 title = data["title"]
@@ -200,7 +227,12 @@ class TextLevel(Level):
             if ("fatal_text" in data.keys()) and (isinstance(data["fatal_text"], list)):
                 fatal_text = data["fatal_text"]
 
+            if debug:
+                print("About to construct TextLevel from JSON")
+
+            print("at end of from_json, id is ", id,)
             return TextLevel(
+                id=id,
                 title=title,
                 lyre=lyre,
                 difficulty=difficulty,
@@ -220,7 +252,8 @@ class TextLevel(Level):
             )
 
     def print(self):
-        self.text_utility.clear_screen()
+        if not self.debug:
+            self.text_utility.clear_screen()
         self.print_header()
         self.print_lyre()
         self.print_lyre_prompt()
@@ -238,29 +271,31 @@ class TextLevel(Level):
             (self.level.state == self.level.LevelState.EURYDICE_FAIL) or \
             (self.level.state == self.level.LevelState.EURYDICE_THWARTED):
             return self.Phase.DEDUCTION
-    
-        raise self.Phase.InvalidPhaseException()
+        
+        raise self.Phase.InvalidPhaseException(f"Got invalid phase at level state {str(self.level.state)}")
     
     def graceful_shutdown(self):
-        self.text_utility.clear_screen()
-        self.text_utility.fade_msg(
-                "Your song dwindles into nothingness...",
-                1000,
-                4,
-                min_time_in_ms_per_it=250,
-            )
-        time.sleep(1)
+        if not self.debug:
+            self.text_utility.clear_screen()
+            self.text_utility.fade_msg(
+                    "Your song dwindles into nothingness...",
+                    1000,
+                    4,
+                    min_time_in_ms_per_it=250,
+                )
+            time.sleep(1)
         raise SystemExit(0)
     
-    def quit_or_try_again(self):
-        print("Press Q + <Enter> to quit. Press <Enter> to try again.")
+    def quit_or_try_again(self) -> bool:
+        print("Press Q + <Enter> to return to menu. Press <Enter> to try again.")
 
         i = input().strip()
         if i.upper() == "Q":
-            self.graceful_shutdown()
-
+            return False
+        
         self.reset()
         self.run()
+        return True
 
     def end(self):
         if self.level.state == Level.LevelState.SUCCESS:
@@ -275,12 +310,15 @@ class TextLevel(Level):
 
     def end_with_look(self):            
             def _force_look_back():
-                demand = "Press any key to look back".upper()
-                self.text_utility.flash_msg(self.text_utility.center_text(line=demand), 1, 3)
-                _ = input()
-                self.text_utility.clear_screen()
-                _print_demise_str()
-                time.sleep(3)
+                if not self.debug:
+                    demand = "Press any key to look back".upper()
+                    self.text_utility.flash_msg(self.text_utility.center_text(line=demand), 1, 3)
+                    _ = input()
+                    self.text_utility.clear_screen()
+                    _print_demise_str()
+                    time.sleep(3)
+                else:
+                    print("Forced look back.")
             
             def _print_demise_str():
                 demise_strs = [
@@ -306,13 +344,23 @@ class TextLevel(Level):
         self,
         broken_string: Note,        
     ):
-        self.text_utility.clear_screen()
-        print(self.text_utility.center_text(
+        if not self.debug:
+            self.text_utility.clear_screen()
+
+        lines = []
+
+        if broken_string is None:
+            lines = [
+                "A terrible screech rings out as one of your strings snaps.",
+                "Who is Orpheus without his lyre?",
+                "He doesn't continue in this game."
+            ]
+        else:
             lines=[
                 f"Your {broken_string.name} string snaps with a discordant twang.",
                 "Without your lyre, you cannot go on."
             ]
-        ))
+        print(self.text_utility.center_text(lines=lines))
 
         self.quit_or_try_again()
 
@@ -375,35 +423,47 @@ class TextLevel(Level):
         print(self.level)
 
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
-        print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
-        time.sleep(linger_time_s)
+        if not self.debug:
+            self.text_utility.clear_screen()
+            print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
+            time.sleep(linger_time_s)
+            self.text_utility.wait_for_enter()
+        else:
+            print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
-        print(self.text_utility.center_text(fail_msg))
-        time.sleep(linger_time_s)
+        if not self.debug:
+            self.text_utility.clear_screen()
+            print(self.text_utility.center_text(fail_msg))
+            time.sleep(linger_time_s)
+            self.text_utility.wait_for_enter()
+        else:
+            print(self.text_utility.center_text(fail_msg))
+
         self.fail_idx += 1
 
     def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
-        self.text_utility.clear_screen()
         fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
-        print(self.text_utility.center_text(fatal_msg))
-        time.sleep(linger_time_s)
+
+        if not self.debug:
+            self.text_utility.clear_screen()
+            print(self.text_utility.center_text(fatal_msg))
+            time.sleep(linger_time_s)
+        else:
+            print(self.text_utility.center_text(fatal_msg))
+
         self.fatal_idx += 1
 
     def format_song_line(
         self,
         notes: t.List[Note],
         total: int,
-        is_eurydices_turn: bool,
-        eurydice_sum_len: t.Optional[int],
     ) -> str:
         values = [str(note.val) for note in notes]
 
-        if is_eurydices_turn:
-            blanks_needed = max((eurydice_sum_len or 0) - len(notes), 0)
+        if self.phase() == TextLevel.Phase.DEDUCTION:
+            blanks_needed = max((self.level.eurydice_goal.sum_len or 0) - len(notes), 0)
             values.extend("_" for _ in range(blanks_needed))
 
         if not values:
@@ -440,8 +500,6 @@ class TextLevel(Level):
         self,
         notes: t.List[Note],
         total: int,
-        is_eurydices_turn: t.Optional[bool]=False,
-        eurydice_sum_len: t.Optional[int]=0,
         warning: t.Optional[str]="",
     ) -> str:
         """
@@ -453,26 +511,21 @@ class TextLevel(Level):
         where the same terminal row updates in-place while the user types, switch
         this method to a raw-key reader later.
         """
-        song_line = self.format_song_line(notes, total, is_eurydices_turn, eurydice_sum_len)
+        song_line = self.format_song_line(notes, total)
         return input(f"{song_line}\n{warning}\n> ").strip()
 
     def run(
         self,
-        orpheus_tutorial: t.Optional[bool] = False,
-        deduction_tutorial: t.Optional[bool] = False,
-    ):
+        tutorial_phase: t.Optional[TextLevel.TutorialPhase] = TutorialPhase.NO_TUT,
+    ) -> t.Union[bool, TextLevel]:
         def _accept_notes(
             notes: t.List[Note],
             total: int,
-            is_eurydices_turn: t.Optional[bool] = False,
-            eurydice_sum_len: t.Optional[int] = 0,
         ) -> t.Tuple[int, int]:
             self.print()
             i = self.read_note(
                 notes,
                 total,
-                bool(is_eurydices_turn),
-                eurydice_sum_len,
             )
 
             while (i.upper() != "X") and (i.upper() != "Q"):
@@ -500,8 +553,6 @@ class TextLevel(Level):
                 i = self.read_note(
                     notes,
                     total,
-                    bool(is_eurydices_turn),
-                    eurydice_sum_len,
                     warning,
                 )
             
@@ -511,26 +562,43 @@ class TextLevel(Level):
             return total, len(notes)
 
         try:  
-            # ORPHEUS PHASE      
-            if self.debug:
-                print("Entering Orpheus phase...")             
+            if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
+                self.state = Level.LevelState.ORPHEUS_SUCCESS
+            else:
+                # ORPHEUS PHASE      
+                if self.debug:
+                    print("Entering Orpheus phase...")             
 
-            total, _ = _accept_notes([], 0)
-            self.level.try_orpheus(total)
+                try:
+                    total, _ = _accept_notes([], 0)
+                    self.level.try_orpheus(total)
+                except TextLevel.QuitGameException:
+                    return False
 
-            if self.level.state == Level.LevelState.ORPHEUS_FATAL:
-                self.end()
-                return
+                if self.level.state == Level.LevelState.ORPHEUS_FATAL:
+                    self.print_fatal_msg()
+                    return self.quit_or_try_again()
 
-            if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
-                print(f"Got unexpected level state {str(self.level.state)}")
-                return
+                if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
+                    print(f"Got unexpected level state {str(self.level.state)}")
+                    self.text_utility.wait_for_enter()
+                    
+                    return False
 
+            # DEDUCTION PHASE
             if not self.orpheus_only:
-                eurydice_sum_length = self.level.set_eurydice_goal()
+                if tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
+                    return True
+                
+                if (tutorial_phase == TextLevel.TutorialPhase.NO_TUT) or \
+                    (tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START):         
+                    self.level.set_eurydice_goal()
+
+                if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START:
+                    return self
 
                 if self.debug:
-                    print(f"Set Eurydice's goal to {self.level.eurydice_goal.val} ({eurydice_sum_length} addends)")
+                    print(f"Set Eurydice's goal to {self.level.eurydice_goal.val} ({self.level.eurydice_goal.sum_len} addends)")
                 
                 while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
                     self.level.state == Level.LevelState.EURYDICE_FAIL
@@ -543,36 +611,60 @@ class TextLevel(Level):
                     total, num_notes = _accept_notes(
                         [],
                         0,
-                        True,
-                        eurydice_sum_length,
                     )
 
-                    self.level.check_eurydice(num_notes, total, eurydice_sum_length)
+                    self.level.check_eurydice(num_notes, total)
 
                     if self.level.state == Level.LevelState.EURYDICE_THWARTED:
-                        self.text_utility.clear_screen()
+                        if not self.debug:
+                            self.text_utility.clear_screen()
                         lines = [
                             self.thwart_line,
                             "The gods mercifully restore your lyre so that you may try again.",
-                            "Press <Enter> to continue",
                         ]
                         print(self.text_utility.center_text(lines=lines))
 
                         if self.debug:
                             print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
-                        _ = input()
+                            _ = input()
                         self.level.resolve_thwart()
+                        self.text_utility.wait_for_enter()
                         continue
 
                     if self.level.state == Level.LevelState.EURYDICE_FAIL:
+                        self.text_utility.wait_for_enter()
                         self.print_fail_msg()
                         continue
-            if orpheus_tutorial:
-                print(self.text_utility.center_text("Nice work. You're ready for the hard part."))
-                _ = input("Press <Enter> to continue.")
+                    elif self.level.state == Level.LevelState.EURYDICE_FATAL:
+                        self.print_fatal_msg()
+                        return self.quit_or_try_again()
+                    
+                    elif self.level.state == Level.LevelState.SUCCESS:
+                        self.print_success_msg()
+
+                        if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
+                            lines = [
+                                "Nice work. Now you know how to play both for",
+                                "yourself and for others.",
+                                "",
+                                "Best of luck on your journey."
+                            ]
+                            print(self.text_utility.center_text(lines=lines))
+                            self.text_utility.wait_for_enter()
+
+                        return True
+            elif tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY and\
+                self.level.state == Level.LevelState.ORPHEUS_SUCCESS:
+                lines = [
+                    "Nice work. You're ready for the hard part.",
+                    "Let's try another level. The first phase will",
+                    "be the same as this one: play only for yourself."
+                ]
+                print(self.text_utility.center_text(lines=lines))
+                self.text_utility.wait_for_enter()
                 return True
             else:
-                self.end()
+                return False
         except KeyboardInterrupt:
             self.graceful_shutdown()
         except TextLevel.QuitGameException:

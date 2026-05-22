@@ -1,8 +1,11 @@
 import shutil
 import random
+import re
 import textwrap
 import time
 import typing as t
+
+CONTINUE_PROMPT = "Press <Enter> to continue."
 
 class RequirementVerb():
         def __init__(
@@ -26,6 +29,8 @@ class RequirementVerb():
             return self.plural
 
 class TextUtility:
+    ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
     def __init__(
         self,
         rng: t.Optional[random.Random] = random.Random(),
@@ -40,15 +45,35 @@ class TextUtility:
     def get_term_height(self) -> int:
         return shutil.get_terminal_size(fallback=(80, 24)).lines
     
-    def get_horizontal_padding(
-            self,
-            term_width: int,
-            s: str
-        ) -> int:
-        padding = int((term_width - len(s)) // 2)
-        if padding < 0:
-            padding = 0
-        return padding
+    def visible_len(self, s: str) -> int:
+        return len(self.ANSI_RE.sub("", s))
+
+    def get_horizontal_padding(self, term_width: int, s: str) -> int:
+        padding = (term_width - self.visible_len(s)) // 2
+        return max(padding, 0)
+
+    def wrap_lines(self, lines: t.List[str], width: int) -> t.List[str]:
+        """
+        Keep ANSI-colored lines intact. For now, don't wrap colored lines;
+        just preserve them so centering doesn't break escape codes.
+        """
+        usable_width = max(width, 20)
+        wrapped: t.List[str] = []
+
+        for line in lines:
+            if line == "":
+                wrapped.append("")
+            elif "\x1b[" in line:
+                wrapped.append(line)
+            else:
+                wrapped.extend(textwrap.wrap(
+                    line,
+                    width=usable_width,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                ) or [""])
+
+        return wrapped
     
     def get_vertical_padding(
             self,
@@ -91,34 +116,6 @@ class TextUtility:
       for _ in range(n):
         print("\033[F\033[K", end="")
 
-    def wrap_lines(
-        self,
-        lines: t.List[str],
-        width: int
-    ) -> t.List[str]:
-        """
-        Wrap long lines so horizontal centering stays sane even in narrow terminals.
-        Blank lines are preserved.
-        """
-        usable_width = max(width, 20)
-        wrapped: t.List[str] = []
-
-        for line in lines:
-            if line == "":
-                wrapped.append("")
-                continue
-
-            wrapped.extend(
-                textwrap.wrap(
-                    line,
-                    width=usable_width,
-                    break_long_words=False,
-                    break_on_hyphens=False,
-                ) or [""]
-            )
-
-        return wrapped
-
     def get_content_width(
         self,
         max_width: t.Optional[int]=None,
@@ -131,6 +128,24 @@ class TextUtility:
         content_width = max(1, min(content_width, term_width))
 
         return content_width
+    
+    def print_padded_lines(
+        self,
+        lines: t.List[str]
+    ):
+      num_lines = self.get_all_but_last_line_padding(lines)
+      for _ in range(0, num_lines):
+          print()
+
+    def pad_and_continue(
+        self,
+        lines: t.List[str]
+    ):
+        self.print_padded_lines(lines)
+        _ = input(CONTINUE_PROMPT)
+
+    def wait_for_enter(self):
+        _ = input(CONTINUE_PROMPT)
     
     def center_text(
         self,
@@ -177,24 +192,34 @@ class TextUtility:
             output_lines.extend("" for _ in range(top_padding))
 
             return "\n".join(output_lines)
-        elif (multi_lines is not None):
-            total_height = 0
+        elif multi_lines is not None:
             rendered_line_groups = []
-            for lines in multi_lines:
-                rendered_lines = self.wrap_lines(lines, self.get_content_width(max_width))
+            total_height = 0
+
+            for group in multi_lines:
+                rendered_lines = self.wrap_lines(group, self.get_content_width(max_width))
                 rendered_line_groups.append(rendered_lines)
                 total_height += len(rendered_lines)
-            
-            in_between_padding = (term_height - total_height) // (len(multi_lines) - 1)
 
-            res = ""
+            gap_count = max(len(rendered_line_groups) - 1, 1)
+            available_gap = max(term_height - total_height - 2, 1)
+            in_between_padding = available_gap // gap_count
 
-            for i, line_group in enumerate(rendered_line_groups):
-                res += "\n".join(line_group)
+            output_lines: t.List[str] = []
 
-                if (i < (len(rendered_line_groups) - 1)):
-                    res += "\n" * in_between_padding
-            return res
+            if vertical:
+                top_padding = max((term_height - total_height - (in_between_padding * (len(rendered_line_groups) - 1))) // 2, 0)
+                output_lines.extend("" for _ in range(top_padding))
+
+            for i, group in enumerate(rendered_line_groups):
+                for rendered_line in group:
+                    left_padding = self.get_horizontal_padding(term_width, rendered_line) if horizontal else 0
+                    output_lines.append((" " * left_padding) + rendered_line)
+
+                if i < len(rendered_line_groups) - 1:
+                    output_lines.extend("" for _ in range(in_between_padding))
+
+            return "\n".join(output_lines)
         
     def get_all_but_last_line_padding(
         self,
@@ -302,3 +327,142 @@ class TextUtility:
         else:
             print(msg)
         
+    def story_screen(
+        self,
+        top_lines: t.List[str],
+        bottom_lines: t.Optional[t.List[str]] = None,
+        max_width: int = 72,
+    ):
+        if not self.debug:
+            self.clear_screen()
+
+        groups = [top_lines]
+        if bottom_lines:
+            groups.append(bottom_lines)
+
+        print(self.center_text(
+            multi_lines=groups,
+            max_width=max_width,
+            horizontal=True,
+            vertical=True,
+        ))
+
+        self.wait_for_enter()
+
+    def prose_screen(
+        self,
+        lines: t.List[str],
+        footnote_lines: t.Optional[t.List[str]] = None,
+        center_footnotes: t.Optional[bool] = False,
+        max_width: int = 64,
+    ):
+        if not self.debug:
+            self.clear_screen()
+
+        term_width = self.get_term_width()
+        term_height = self.get_term_height()
+
+        wrapped = self.wrap_lines(lines, max_width)
+        footnote_wrapped = self.wrap_lines(footnote_lines or [], max_width)
+
+        block_width = max((self.visible_len(line) for line in wrapped), default=0)
+        left_padding = max((term_width - block_width) // 2, 0)
+
+        top_padding = max((term_height - len(wrapped)) // 2 - 2, 0)
+        print("\n" * top_padding, end="")
+
+        for line in wrapped:
+            print((" " * left_padding) + line)
+
+        # Footnote area, near bottom.
+        prompt_reserved_lines = 2
+        footnote_gap = max(
+            term_height
+            - top_padding
+            - len(wrapped)
+            - len(footnote_wrapped)
+            - prompt_reserved_lines,
+            1,
+        ) - 1
+
+        print("\n" * footnote_gap, end="")
+
+        if footnote_wrapped:
+            print("-" * term_width)
+            footnote_width = max((self.visible_len(line) for line in footnote_wrapped), default=0)
+            footnote_left_padding = max((term_width - footnote_width) // 2, 0) if center_footnotes else 0
+
+            for line in footnote_wrapped:
+                print((" " * footnote_left_padding) + line)
+
+        self.wait_for_enter()
+
+    def menu_screen(
+        self,
+        lines: t.List[str],
+        footnote_lines: t.Optional[t.List[str]] = None,
+        center_footnotes: t.Optional[bool] = False,
+        max_width: int = 64,
+        prompt: t.Optional[str] = None,
+        additional_prompt: t.Optional[str] = None,
+        is_submenu: t.Optional[bool] = False
+    ) -> str:
+        default_prompt_lines = [
+            "Please enter the number of the option you wish to select and press <Enter>.",
+            "Enter Q followed by <Enter> to quit.",
+            "> "
+        ]
+
+        if is_submenu:
+            default_prompt_lines.insert(
+                1,
+                "Enter B followed by <Enter> to go back to the previous menu."
+            )
+
+        if additional_prompt:
+            default_prompt_lines.insert(
+                0,
+                additional_prompt
+            )
+
+        actual_prompt = prompt or "\n".join(default_prompt_lines)
+
+        if not self.debug:
+            self.clear_screen()
+
+        term_width = self.get_term_width()
+        term_height = self.get_term_height()
+
+        wrapped = self.wrap_lines(lines, max_width)
+        footnote_wrapped = self.wrap_lines(footnote_lines or [], max_width)
+
+        block_width = max((self.visible_len(line) for line in wrapped), default=0)
+        left_padding = max((term_width - block_width) // 2, 0)
+
+        top_padding = max((term_height - len(wrapped)) // 2 - 2, 0)
+        print("\n" * top_padding, end="")
+
+        for line in wrapped:
+            print((" " * left_padding) + line)
+
+        # Footnote area, near bottom.
+        prompt_reserved_lines = 2
+        footnote_gap = max(
+            term_height
+            - top_padding
+            - len(wrapped)
+            - len(footnote_wrapped)
+            - prompt_reserved_lines,
+            1,
+        ) - 1
+
+        print("\n" * footnote_gap, end="")
+
+        if footnote_wrapped:
+            footnote_width = max((self.visible_len(line) for line in footnote_wrapped), default=0)
+            footnote_left_padding = max((term_width - footnote_width) // 2, 0) if center_footnotes else 0
+
+            for line in footnote_wrapped:
+                print((" " * footnote_left_padding) + line)
+
+        return input(actual_prompt)

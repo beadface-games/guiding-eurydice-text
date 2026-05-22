@@ -1,0 +1,413 @@
+import json
+import os
+import pathlib
+import sys
+import typing as t
+
+from datetime import datetime as dt
+
+from src.level import TextLevel
+from src._utils import TextUtility
+
+DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
+APP_NAME = "GuidingEurydice"
+DEFAULT_LEVEL_DATA_DIR = pathlib.Path("guiding_eurydice_levels/levels/")
+
+def get_save_dir(app_name: str = APP_NAME) -> pathlib.Path:
+    """
+    Return a user-writable directory for save/config data.
+
+    Windows: C:\\Users\\<user>\\AppData\\Roaming\\<app_name>
+    macOS:   /Users/<user>/Library/Application Support/<app_name>
+    Linux:   /home/<user>/.local/share/<app_name>
+    """
+
+    if sys.platform == "win32":
+        base = os.getenv("APPDATA")
+        if base is None:
+            base = pathlib.Path.home() / "AppData" / "Roaming"
+        else:
+            base = pathlib.Path(base)
+
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+
+    else:
+        # Linux / Unix
+        # Respects the XDG Base Directory spec when available.
+        base = os.getenv("XDG_DATA_HOME")
+        if base is None:
+            base = Path.home() / ".local" / "share"
+        else:
+            base = Path(base)
+
+    save_dir = base / app_name
+    save_dir.mkdir(parents=True, exist_ok=True)
+    return save_dir
+
+DEFAULT_PROFILE_DATA_DIR = get_save_dir().joinpath(pathlib.Path("profiles/"))
+
+class Stats():
+    def __init__(
+        self,
+        num_orpheus_fatals: t.Optional[int] = None,
+        num_orpheus_successes: t.Optional[int] = None,
+        num_eurydice_fatals: t.Optional[int] = None,
+        num_successes: t.Optional[int] = None,
+    ):
+        self.num_orpheus_fatals = num_orpheus_fatals or 0
+        self.num_orpheus_successes = num_orpheus_successes or 0
+        self.num_eurydice_fatals = num_eurydice_fatals or 0
+        self.num_successes = num_successes or 0
+
+    def to_dict(self) -> t.Dict[str, t.Any]:
+        return {
+            "num_orpheus_fatals": self.num_orpheus_fatals,
+            "num_orpheus_successes": self.num_orpheus_successes,
+            "num_eurydice_fatals": self.num_eurydice_fatals,
+            "num_successes": self.num_successes
+        }
+    
+    @staticmethod
+    def from_dict(data: t.Dict[str, t.Any]) -> Stats:
+        num_orpheus_fatals = None
+        num_orpheus_successes = None
+        num_eurydice_fatals = None
+        num_successes = None
+
+        if ("num_orpheus_fatals" in data.keys()) and (isinstance(data["num_orpheus_fatals"], int)):
+            num_orpheus_fatals = data["num_orpheus_fatals"]
+        
+        if ("num_orpheus_successes" in data.keys()) and (isinstance(data["num_orpheus_successes"], int)):
+            num_orpheus_successes = data["num_orpheus_successes"]
+
+        if ("num_eurydice_fatals" in data.keys()) and (isinstance(data["num_eurydice_fatals"], int)):
+            num_eurydice_fatals = data["num_eurydice_fatals"]
+
+        if ("num_successes" in data.keys()) and (isinstance(data["num_successes"], int)):
+            num_successes = data["num_successes"]
+
+        return Stats(
+            num_orpheus_fatals=num_orpheus_fatals,
+            num_orpheus_successes=num_orpheus_successes,
+            num_eurydice_fatals=num_eurydice_fatals,
+            num_successes=num_successes,
+        )
+
+    def all_attempts(self) -> int:
+        return self.num_orpheus_fails + \
+                self.num_orpheus_successes + \
+                self.num_eurydice_fails + \
+                self.num_successes
+
+
+class LevelInfo():
+    class LevelMissingException(Exception):
+        pass
+
+    def __init__(
+        self,
+        id: int,
+        title: str,
+        level_path: t.Optional[pathlib.Path] = None,
+        tutorial_complete: t.Optional[bool] = False,
+        stats: t.Optional[LevelInfo.Stats] = None,
+        locked: t.Optional[bool] = True,
+        debug: t.Optional[bool] = False,
+    ):
+        if not id:
+            raise ValueError(f"No ID provided for profile at path {level_path}")
+        
+        self.id = id
+        self.level_path = level_path or DEFAULT_LEVEL_DATA_DIR.joinpath(pathlib.Path("level" + str(id) + ".json"))
+        self.title = title 
+
+        if not os.path.exists(self.level_path):
+            raise LevelInfo.LevelMissingException()
+        
+        self.tutorial_complete = tutorial_complete
+        self.locked = locked
+
+        self.stats = stats or Stats()
+        self.debug = debug
+
+    def __str__(self) -> str:
+        res = ""
+        res += "LevelInfo".upper() + "\n"
+        res += "id: " + str(self.id) + "\n"
+        res += "title: " + self.title + "\n"
+        res += "level_path:" + str(self.level_path) + "\n"
+        res += "tutorial_complete: " + str(self.tutorial_complete) + "\n"
+        res += "stats: " + str(self.stats) + "\n"
+        res += "locked: " + str(self.locked) + "\n"
+        return res
+
+    def unlock(self):
+        self.locked = False 
+
+    def to_dict(self) -> t.Dict[str, t.Any]:
+        lid = {}
+        lid["title"] = self.title
+        lid["level_path"] = str(self.level_path)
+        lid["tutorial_complete"] = self.tutorial_complete
+        lid["locked"] = self.locked
+        lid["stats"] = self.stats.to_dict()
+
+        return lid
+    
+    @staticmethod
+    def from_dict(
+        id: int,
+        level_data: t.Dict[str, t.Any],
+        debug: t.Optional[bool] = False,
+    ) -> LevelInfo:
+        title = None
+        level_path = None
+        tutorial_complete = False
+        locked = True
+        stats = None
+        
+        if ("title" in level_data.keys()) and (isinstance(level_data["title"], str)):
+            title = level_data["title"]
+
+        if ("level_path" in level_data.keys()) and (isinstance(level_data["level_path"], str)):
+            level_path = level_data["level_path"]
+
+        if ("tutorial_complete" in level_data.keys()) and (isinstance(level_data["tutorial_complete"], bool)):
+            tutorial_complete = level_data["tutorial_complete"]
+        
+        if ("locked" in level_data.keys()) and (isinstance(level_data["locked"], bool)):
+            locked = level_data["locked"]
+        
+        if ("stats" in level_data.keys()) and (isinstance(level_data["stats"], dict)):
+            stats = Stats.from_dict(level_data["stats"])
+
+        return LevelInfo(
+            id=id,
+            title=title,
+            level_path=level_path,
+            tutorial_complete=tutorial_complete,
+            locked=locked,
+            stats=stats,
+            debug=debug
+        )
+
+    def level(self) -> TextLevel:
+        return TextLevel.from_json(
+            json_path=pathlib.Path(self.level_path),
+            debug=self.debug,
+        )
+
+class Profile():
+    class CorruptProfileException(Exception):
+        pass
+
+    def __init__(
+        self,
+        id: int,
+        file_path: pathlib.Path,
+        name: t.Optional[str] = None,
+        level_infos: t.Optional[t.Dict[int, LevelInfo]] = None,
+        timestamp: t.Optional[dt] = None,
+        profile_data_dir: t.Optional[pathlib.Path] = None,
+        level_data_dir: t.Optional[pathlib.Path] = None,
+        has_viewed_intro: t.Optional[bool] = False,
+        debug: t.Optional[bool] = False,
+    ):
+        self.id = id
+        self.file_path = file_path
+        self.name = name or ""
+        self.level_infos: t.Dict[int, LevelInfo] = level_infos or {}
+        self.timestamp = timestamp or dt.now()
+        self.profile_data_dir = profile_data_dir or DEFAULT_PROFILE_DATA_DIR
+        self.level_data_dir = level_data_dir or DEFAULT_LEVEL_DATA_DIR
+        self.has_viewed_intro = has_viewed_intro
+        self.debug = debug
+
+        self.text_utility = TextUtility(debug=self.debug)
+
+        if len(self.level_infos.keys()) < 1:
+            self.init_levels()
+        else:
+            for _, li in self.level_infos.items():
+                li.debug = self.debug
+
+    @staticmethod
+    def load(
+        profile_data: t.Dict[str, t.Any],
+        debug: t.Optional[bool] = False
+    ) -> Profile:
+        file_path = None
+        id = None
+        name = None
+        level_infos = {}
+        timestamp = None
+        profile_data_dir = None
+        level_data_dir = None
+        has_viewed_intro = None
+
+        if ("file_path" in profile_data.keys()) and (isinstance(profile_data["file_path"], str)):
+            file_path = pathlib.Path(profile_data["file_path"])
+
+        if ("id" in profile_data.keys()) and (isinstance(profile_data["id"], int)):
+            id = profile_data["id"]
+        else:
+            raise Profile.CorruptProfileException()
+
+        if ("name" in profile_data.keys()) and (isinstance(profile_data["name"], str)):
+            name = profile_data["name"]
+
+        if ("timestamp" in profile_data.keys()) and (isinstance(profile_data["timestamp"], str)):
+            try:
+                timestamp = dt.strptime(profile_data["timestamp"], DATE_FORMAT_STR)
+            except ValueError:
+                if debug:
+                    print(f"Failed to parse timestamp {profile_data["timestamp"]}. Setting to now")
+                    timestamp = dt.now()
+        else:
+            timestamp = dt.now()
+        
+        if ("level_info" in profile_data.keys()) and (isinstance(profile_data["level_info"], dict)):
+            for i, lid in profile_data["level_info"].items():
+                id_int = int(i)
+                if (isinstance(lid, dict)):
+                    level_info = LevelInfo.from_dict(id=id_int, level_data=lid)
+                    level_infos[id_int] = level_info
+
+        if ("level_data_dir" in profile_data.keys()) and (isinstance(profile_data["level_data_dir"], str)):
+            level_data_dir = pathlib.Path(profile_data["level_data_dir"])
+
+        if ("profile_data_dir" in profile_data.keys()) and (isinstance(profile_data["profile_data_dir"], str)):
+            profile_data_dir = pathlib.Path(profile_data["profile_data_dir"])
+        
+        if ("has_viewed_intro" in profile_data.keys()) and (isinstance(profile_data["has_viewed_intro"], bool)):
+            has_viewed_intro = profile_data["has_viewed_intro"]
+        
+        return Profile(
+            file_path=file_path,
+            id=id,
+            name=name,
+            level_infos=level_infos,
+            timestamp=timestamp,
+            profile_data_dir=profile_data_dir,
+            level_data_dir=level_data_dir,
+            has_viewed_intro=has_viewed_intro,
+            debug=debug
+        )
+    
+    def to_dict(self) -> t.Dict[str, t.Any]:
+        res = {}
+
+        res["id"] = self.id
+        res["file_path"] = str(self.file_path)
+        res["name"] = self.name
+
+        lis = {}
+        for id, li in self.level_infos.items():
+            id_int = -1
+            id_int = int(id)
+            lid = li.to_dict()
+            lis[id_int] = lid
+
+        res["level_info"] = lis
+        res["timestamp"] = dt.strftime(self.timestamp, DATE_FORMAT_STR)
+        res["profile_data_dir"] = str(self.profile_data_dir)
+        res["level_data_dir"] = str(self.level_data_dir)
+        res["has_viewed_intro"] = self.has_viewed_intro
+
+        return res
+    
+    def update_timestamp(self):
+        self.timestamp = dt.now()
+    
+    def save(self) -> pathlib.Path:
+        self.update_timestamp()
+        dict = self.to_dict()
+
+        ex = None
+        file_path = self.profile_data_dir.joinpath("{:02d}".format(self.id) + "_" + self.name + "_profile.json")  
+        with open(file_path, "w") as f:
+            try:
+                json.dump(dict, f, indent=4)
+            except Exception as e:
+                ex = e
+                
+        if ex:
+            os.remove(file_path)
+            raise(ex)       
+        
+        return self.file_path
+    
+    def init_levels(self):
+        level_infos = {}
+        level_files = []
+        
+        for _, _, filenames in os.walk(self.level_data_dir):
+            level_files.extend(filenames)
+
+        if len(level_files) < 1:
+            raise FileNotFoundError(f"Couldn't find level files in {str(self.level_data_dir)}")
+        
+        for file in level_files:
+            if file.startswith("level") and file.endswith(".json"):
+                file_path = self.level_data_dir.joinpath(file)
+                with open(file_path, "r") as f:
+                    data = json.load(f)
+                    title = None
+                    id = None
+
+                    if ("id" in data.keys()) and (isinstance(data["id"], int)):
+                        id = data["id"]
+
+                    else:
+                        raise ValueError(f"No id found in level file {file_path}")
+
+                    if ("title" in data.keys()) and (isinstance(data["title"], str)):
+                        title = data["title"]
+                    else:
+                        raise ValueError(f"No title found in level file {file_path}")
+
+                    tutorial_complete = False if id < 3 else True
+            
+                    level_info = LevelInfo(
+                        id=id,
+                        title=title,
+                        level_path=file_path,
+                        tutorial_complete=tutorial_complete,
+                        stats=Stats(),
+                        locked=True,
+                        debug=self.debug,
+                    )
+            
+                    level_infos[id] = level_info
+        
+        self.level_infos = level_infos
+
+        if len(self.level_infos) < 1:
+            raise ValueError(f"Failed to load any levels at {str(self.level_data_dir)}")
+
+        self.level_infos[1].unlock()
+
+
+
+        
+        
+
+
+        
+
+
+
+
+    
+
+
+
+
+
+                
+
+
+
+
+
