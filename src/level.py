@@ -1,18 +1,21 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import annotations
 from enum import Enum
 
 import json
 import pathlib
+import sys
 import time
 import typing as t
 
 from guiding_eurydice_core.src.difficulty import Difficulty
 from guiding_eurydice_core.src.lyre import Lyre, Note
 from guiding_eurydice_core.src.level import Goal, Level
-from src._utils import RequirementVerb, TextUtility
+from src._utils import resource_path, RequirementVerb, TextUtility
 
-DIFFICULTY_JSON_PATH = pathlib.Path("guiding_eurydice_levels/difficulty_settings.json")
 
+DIFFICULTY_JSON_PATH = resource_path("guiding_eurydice_levels/difficulty_settings.json")
 
 class TextLevel(Level):
     class QuitGameException(Exception):
@@ -153,7 +156,7 @@ class TextLevel(Level):
         if debug:
             print("Creating text level from JSON")
 
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
             if ("id" in data.keys()) and (isinstance(data["id"], int)):
@@ -328,7 +331,7 @@ class TextLevel(Level):
                     "and be held. He caught nothing but thin air.",
                 ]
 
-                print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(demise_strs)))
+                print(self.text_utility.story_screen(top_lines=demise_strs))
             
             if self.level.state == Level.LevelState.ORPHEUS_FATAL:
                 self.print_fatal_msg()
@@ -425,11 +428,11 @@ class TextLevel(Level):
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
         if not self.debug:
             self.text_utility.clear_screen()
-            print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
+            print(self.text_utility.center_text(lines=self.success_text))
             time.sleep(linger_time_s)
             self.text_utility.wait_for_enter()
         else:
-            print(self.text_utility.center_text(lines=self.text_utility.boxify_lines(lines=self.success_text)))
+            print(self.text_utility.center_text(lines=self.success_text))
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
@@ -632,7 +635,6 @@ class TextLevel(Level):
                         continue
 
                     if self.level.state == Level.LevelState.EURYDICE_FAIL:
-                        self.text_utility.wait_for_enter()
                         self.print_fail_msg()
                         continue
                     elif self.level.state == Level.LevelState.EURYDICE_FATAL:
@@ -663,6 +665,8 @@ class TextLevel(Level):
                 print(self.text_utility.center_text(lines=lines))
                 self.text_utility.wait_for_enter()
                 return True
+            elif self.level.state == Level.LevelState.ORPHEUS_SUCCESS:
+                self.print_success_msg()
             else:
                 return False
         except KeyboardInterrupt:

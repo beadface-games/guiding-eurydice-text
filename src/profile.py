@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import json
 import os
 import pathlib
@@ -7,45 +9,39 @@ import typing as t
 from datetime import datetime as dt
 
 from src.level import TextLevel
-from src._utils import TextUtility
+from src._utils import resource_path, TextUtility
+
+from pathlib import Path
+import sys
+
+import sys
+from pathlib import Path
 
 DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
 APP_NAME = "GuidingEurydice"
-DEFAULT_LEVEL_DATA_DIR = pathlib.Path("guiding_eurydice_levels/levels/")
+DEFAULT_LEVEL_DATA_DIR = resource_path("guiding_eurydice_levels/levels/")
 
-def get_save_dir(app_name: str = APP_NAME) -> pathlib.Path:
-    """
-    Return a user-writable directory for save/config data.
-
-    Windows: C:\\Users\\<user>\\AppData\\Roaming\\<app_name>
-    macOS:   /Users/<user>/Library/Application Support/<app_name>
-    Linux:   /home/<user>/.local/share/<app_name>
-    """
-
+def get_user_data_dir(app_name: str = APP_NAME) -> pathlib.Path:
     if sys.platform == "win32":
         base = os.getenv("APPDATA")
-        if base is None:
-            base = pathlib.Path.home() / "AppData" / "Roaming"
-        else:
-            base = pathlib.Path(base)
-
+        base = pathlib.Path(base) if base else pathlib.Path.home() / "AppData" / "Roaming"
     elif sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
-
     else:
-        # Linux / Unix
-        # Respects the XDG Base Directory spec when available.
         base = os.getenv("XDG_DATA_HOME")
-        if base is None:
-            base = Path.home() / ".local" / "share"
-        else:
-            base = Path(base)
+        base = Path(base) if base else Path.home() / ".local" / "share"
 
-    save_dir = base / app_name
-    save_dir.mkdir(parents=True, exist_ok=True)
-    return save_dir
+    app_dir = base / app_name
+    app_dir.mkdir(parents=True, exist_ok=True)
+    print("Made dir ", app_dir)
+    return app_dir
 
-DEFAULT_PROFILE_DATA_DIR = get_save_dir().joinpath(pathlib.Path("profiles/"))
+def get_profiles_dir(app_name: str = APP_NAME) -> pathlib.Path:
+    profiles_dir = get_user_data_dir(app_name) / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    return profiles_dir
+
+DEFAULT_PROFILE_DATA_DIR = get_profiles_dir()
 
 class Stats():
     def __init__(
@@ -122,7 +118,7 @@ class LevelInfo():
         self.level_path = level_path or DEFAULT_LEVEL_DATA_DIR.joinpath(pathlib.Path("level" + str(id) + ".json"))
         self.title = title 
 
-        if not os.path.exists(self.level_path):
+        if not os.path.exists(resource_path(self.level_path)):
             raise LevelInfo.LevelMissingException()
         
         self.tutorial_complete = tutorial_complete
@@ -328,7 +324,7 @@ class Profile():
         file_path = self.profile_data_dir.joinpath("{:02d}".format(self.id) + "_" + self.name + "_profile.json")  
         with open(file_path, "w") as f:
             try:
-                json.dump(dict, f, indent=4)
+                json.dump(dict, f, indent=4, ensure_ascii=False)
             except Exception as e:
                 ex = e
                 
@@ -351,7 +347,7 @@ class Profile():
         for file in level_files:
             if file.startswith("level") and file.endswith(".json"):
                 file_path = self.level_data_dir.joinpath(file)
-                with open(file_path, "r") as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     title = None
                     id = None

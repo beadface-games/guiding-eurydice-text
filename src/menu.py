@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from datetime import datetime as dt
 
 import json
@@ -5,7 +6,6 @@ import os
 import pathlib
 import random
 import re
-import sys
 import time
 import typing as t
 
@@ -59,6 +59,7 @@ class ProfileMenu(Menu):
         super().__init__(debug=debug, rng=rng)
         self.level_data_dir = save_data_dir or DEFAULT_LEVEL_DATA_DIR
         self.profile_data_dir = profile_data_dir or DEFAULT_PROFILE_DATA_DIR
+
 
         self.profiles = {}
         self.load_profiles()
@@ -130,7 +131,7 @@ class ProfileMenu(Menu):
         if len(filenames) != 0:
             for file in filenames:
                 if "profile" in file.lower() and file.endswith(".json"):
-                    with open(self.profile_data_dir.joinpath(file), "r") as f:
+                    with open(self.profile_data_dir.joinpath(file), "r", encoding="utf-8") as f:
                         data = json.load(f)
                         profile = Profile.load(
                             profile_data=data,
@@ -424,7 +425,14 @@ class LevelMenu(Menu):
 
         if res:
             self.profile.level_infos[choice_int].tutorial_complete = True
-            self.profile.level_infos[choice_int + 1].unlock()
+
+            if choice_int < len(self.profile.level_infos.keys()):
+                try:
+                    self.profile.level_infos[choice_int + 1].unlock()
+                except ValueError:
+                    if self.debug:
+                        print("Failed to unlock level", choice_int + 1)
+                        self.text_utility.wait_for_enter()
         
         self.profile.save()
 
