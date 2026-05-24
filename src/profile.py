@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import json
 import os
 import pathlib
@@ -9,7 +8,7 @@ import typing as t
 from datetime import datetime as dt
 
 from src.level import TextLevel
-from src._utils import resource_path, TextUtility
+from src._utils import DEFAULT_LEVEL_DATA_DIR, resource_path, TextUtility
 
 from pathlib import Path
 import sys
@@ -19,7 +18,6 @@ from pathlib import Path
 
 DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
 APP_NAME = "GuidingEurydice"
-DEFAULT_LEVEL_DATA_DIR = resource_path("guiding_eurydice_levels/levels/")
 
 def get_user_data_dir(app_name: str = APP_NAME) -> pathlib.Path:
     if sys.platform == "win32":
@@ -33,7 +31,6 @@ def get_user_data_dir(app_name: str = APP_NAME) -> pathlib.Path:
 
     app_dir = base / app_name
     app_dir.mkdir(parents=True, exist_ok=True)
-    print("Made dir ", app_dir)
     return app_dir
 
 def get_profiles_dir(app_name: str = APP_NAME) -> pathlib.Path:
@@ -115,11 +112,11 @@ class LevelInfo():
             raise ValueError(f"No ID provided for profile at path {level_path}")
         
         self.id = id
-        self.level_path = level_path or DEFAULT_LEVEL_DATA_DIR.joinpath(pathlib.Path("level" + str(id) + ".json"))
+        self.level_path = level_path or pathlib.Path(DEFAULT_LEVEL_DATA_DIR).joinpath(pathlib.Path("level" + str(id) + ".json"))
         self.title = title 
 
         if not os.path.exists(resource_path(self.level_path)):
-            raise LevelInfo.LevelMissingException()
+            raise LevelInfo.LevelMissingException(f"Unable to find level at {self.level_path}")
         
         self.tutorial_complete = tutorial_complete
         self.locked = locked
@@ -190,7 +187,7 @@ class LevelInfo():
 
     def level(self) -> TextLevel:
         return TextLevel.from_json(
-            json_path=pathlib.Path(self.level_path),
+            json_path=resource_path(self.level_path),
             debug=self.debug,
         )
 
@@ -216,7 +213,7 @@ class Profile():
         self.level_infos: t.Dict[int, LevelInfo] = level_infos or {}
         self.timestamp = timestamp or dt.now()
         self.profile_data_dir = profile_data_dir or DEFAULT_PROFILE_DATA_DIR
-        self.level_data_dir = level_data_dir or DEFAULT_LEVEL_DATA_DIR
+        self.level_data_dir = level_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
         self.has_viewed_intro = has_viewed_intro
         self.debug = debug
 
@@ -338,11 +335,11 @@ class Profile():
         level_infos = {}
         level_files = []
         
-        for _, _, filenames in os.walk(self.level_data_dir):
+        for _, _, filenames in os.walk(resource_path(self.level_data_dir)):
             level_files.extend(filenames)
 
         if len(level_files) < 1:
-            raise FileNotFoundError(f"Couldn't find level files in {str(self.level_data_dir)}")
+            raise FileNotFoundError(f"Couldn't find level file {str(resource_path())} in {str(resource_path(self.level_data_dir))}")
         
         for file in level_files:
             if file.startswith("level") and file.endswith(".json"):
@@ -380,7 +377,7 @@ class Profile():
         self.level_infos = level_infos
 
         if len(self.level_infos) < 1:
-            raise ValueError(f"Failed to load any levels at {str(self.level_data_dir)}")
+            raise ValueError(f"Failed to load any levels at {str(resource_path(self.level_data_dir))}")
 
         self.level_infos[1].unlock()
 

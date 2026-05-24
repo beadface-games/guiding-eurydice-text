@@ -15,7 +15,7 @@ def resource_path(relative_path: str) -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parents[2] / relative_path
 
 CONTINUE_PROMPT = "Press <Enter> to continue."
-DEFAULT_LEVEL_DATA_DIR = resource_path("guiding_eurydice_levels/levels")
+DEFAULT_LEVEL_DATA_DIR = "guiding_eurydice_levels/levels"
 
 class RequirementVerb():
         def __init__(

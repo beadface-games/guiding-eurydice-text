@@ -3,4 +3,4 @@
 	url = https://github.com/beadface-tess/guiding-eurydice-core.git
 [submodule "guiding_eurydice_levels"]
 	path = guiding_eurydice_levels
-	url = https://github.com/beadface-tess/guiding-eurydice-levels.git
+	url = git@github.com:beadface-tess/guiding-eurydice-levels.git
