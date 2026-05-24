@@ -43,10 +43,10 @@ class TextUtility:
 
     def __init__(
         self,
-        rng: t.Optional[random.Random] = random.Random(),
+        rng: t.Optional[random.Random] = None,
         debug:t.Optional[bool]=False,
     ):
-        self.rng = rng
+        self.rng = rng or random.Random()
         self.debug = debug        
 
     def get_term_width(self) -> int:

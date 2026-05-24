@@ -54,9 +54,10 @@ class ProfileMenu(Menu):
         save_data_dir: t.Optional[pathlib.Path] = None,
         profile_data_dir: t.Optional[pathlib.Path] = None,
         debug: t.Optional[bool] = False,
-        rng: t.Optional[random.Random] = random.Random(),
+        rng: t.Optional[random.Random] = None,
     ):
-        super().__init__(debug=debug, rng=rng)
+        self.rng = rng or random.Random()
+        super().__init__(debug=debug, rng=self.rng)
         self.level_data_dir = save_data_dir or DEFAULT_LEVEL_DATA_DIR
         self.profile_data_dir = profile_data_dir or DEFAULT_PROFILE_DATA_DIR
 
@@ -338,9 +339,10 @@ class LevelMenu(Menu):
         self,
         profile: Profile,
         debug: t.Optional[bool] = False,
-        rng: t.Optional[random.Random] = random.Random()
+        rng: t.Optional[random.Random] = None
     ):
-        super().__init__(debug=debug, rng=rng)
+        self.rng = rng or random.Random()
+        super().__init__(debug=debug, rng=self.rng)
         self.profile = profile
 
         self.tutorial_player = TutorialPlayer()
@@ -353,18 +355,18 @@ class LevelMenu(Menu):
     def from_profile(
         profile: Profile,
         debug: t.Optional[bool] = False,
-        rng: t.Optional[random.Random] = random.Random()
+        rng: t.Optional[random.Random] = None
     ) -> LevelMenu:
         return LevelMenu(
             profile=profile,
             debug=debug,
-            rng=rng
+            rng=rng or random.Random()
         )
 
     def get_level_strs(self) -> t.List[str]:
         level_strs = []
 
-        for id, level_info in self.profile.level_infos.items():
+        for id, level_info in sorted(self.profile.level_infos.items()):
             level_str = "{:02d}".format(id) + " - "
 
             if level_info.locked:
