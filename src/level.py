@@ -272,7 +272,8 @@ class TextLevel(Level):
 
         if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
             (self.level.state == self.level.LevelState.EURYDICE_FAIL) or \
-            (self.level.state == self.level.LevelState.EURYDICE_THWARTED):
+            (self.level.state == self.level.LevelState.EURYDICE_THWARTED) or \
+            (self.level.state == self.level.LevelState.SUCCESS):
             return self.Phase.DEDUCTION
         
         raise self.Phase.InvalidPhaseException(f"Got invalid phase at level state {str(self.level.state)}")
@@ -429,17 +430,17 @@ class TextLevel(Level):
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
         if not self.debug:
             self.text_utility.clear_screen()
-            print(self.text_utility.center_text(lines=self.success_text))
+            print(self.text_utility.prose_screen(lines=self.success_text) if len(self.success_text) > 1 else print(self.text_utility.center_text(lines=self.success_text)))
             time.sleep(linger_time_s)
             self.text_utility.wait_for_enter()
         else:
-            print(self.text_utility.center_text(lines=self.success_text))
+            print(self.text_utility.prose_screen(lines=self.success_text) if len(self.success_text) > 1 else print(self.text_utility.center_text(lines=self.success_text)))
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
         if not self.debug:
             self.text_utility.clear_screen()
-            print(self.text_utility.center_text(fail_msg))
+            print(self.text_utility.(fail_msg))
             time.sleep(linger_time_s)
             self.text_utility.wait_for_enter()
         else:

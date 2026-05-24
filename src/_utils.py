@@ -181,11 +181,11 @@ class TextUtility:
                     "\x1b[96mCYAN\x1b[0m"
                 )
                 print()
-                print("If not, or if they are difficult to read a modern terminal is recommended.")
+                print("If not, or if they are difficult to read, a modern terminal is recommended.")
                 print("Windows Terminal is free from the Microsoft Store:")
                 print("https://apps.microsoft.com/detail/9N0DX20HK701")
                 print("After you install it, open it and run the following command:")
-                print("cd <path\to\GuidingEurydice.exe>")
+                print("cd <path\\to\GuidingEurydice.exe>")
                 print("Then run this next command: .\GuidingEurydice.exe")
                 print()
                 print("It is NOT recommended to play on your current console.")
