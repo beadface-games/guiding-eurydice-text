@@ -175,7 +175,6 @@ class Profile():
     def __init__(
         self,
         id: int,
-        file_path: pathlib.Path,
         name: t.Optional[str] = None,
         level_infos: t.Optional[t.Dict[int, LevelInfo]] = None,
         timestamp: t.Optional[dt] = None,
@@ -186,7 +185,6 @@ class Profile():
         user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
     ):
         self.id = id
-        self.file_path = file_path
         self.name = name or ""
         self.level_infos: t.Dict[int, LevelInfo] = level_infos or {}
         self.timestamp = timestamp or dt.now()
@@ -209,7 +207,6 @@ class Profile():
         profile_data: t.Dict[str, t.Any],
         debug: t.Optional[bool] = False
     ) -> Profile:
-        file_path = None
         id = None
         name = None
         level_infos = {}
@@ -217,9 +214,6 @@ class Profile():
         profile_data_dir = None
         level_data_dir = None
         has_viewed_intro = None
-
-        if ("file_path" in profile_data.keys()) and (isinstance(profile_data["file_path"], str)):
-            file_path = pathlib.Path(profile_data["file_path"])
 
         if ("id" in profile_data.keys()) and (isinstance(profile_data["id"], int)):
             id = profile_data["id"]
@@ -256,7 +250,6 @@ class Profile():
             has_viewed_intro = profile_data["has_viewed_intro"]
         
         return Profile(
-            file_path=file_path,
             id=id,
             name=name,
             level_infos=level_infos,
@@ -271,7 +264,6 @@ class Profile():
         res = {}
 
         res["id"] = self.id
-        res["file_path"] = str(self.file_path)
         res["name"] = self.name
 
         lis = {}
@@ -308,7 +300,7 @@ class Profile():
             os.remove(file_path)
             raise(ex)       
         
-        return self.file_path
+        return file_path
     
     def init_levels(self):
         level_infos = {}

@@ -167,7 +167,7 @@ class TextLevel(Level):
             
             if ("difficulty" in data.keys()) and (isinstance(data["difficulty"], int)):
                 difficulty = Difficulty.from_json(data["difficulty"], DIFFICULTY_JSON_PATH)
-
+                
             if ("lyre" in data.keys()) and (isinstance(data["lyre"], list)):
                 notes: list[int] = []
                 for item in data["lyre"]:

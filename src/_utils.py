@@ -24,10 +24,10 @@ class UserDataManager:
             base = os.getenv("APPDATA")
             base = pathlib.Path(base) if base else pathlib.Path.home() / "AppData" / "Roaming"
         elif sys.platform == "darwin":
-            base = Path.home() / "Library" / "Application Support"
+            base = pathlib.Path.home() / "Library" / "Application Support"
         else:
             base = os.getenv("XDG_DATA_HOME")
-            base = Path(base) if base else Path.home() / ".local" / "share"
+            base = pathlib.Path(base) if base else pathlib.Path.home() / ".local" / "share"
 
         app_dir = base / app_name
         app_dir.mkdir(parents=True, exist_ok=True)

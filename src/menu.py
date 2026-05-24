@@ -311,7 +311,6 @@ class ProfileMenu(Menu):
 
     def create_new_profile(self) -> LevelMenu:
         id = self.get_next_id()
-        file_path = self.user_data_manager.resource_path(self.level_data_dir.joinpath("{:02d}".format(id) + "_profile.json"))
         
         try:
             self.text_utility.clear_screen()
@@ -324,7 +323,6 @@ class ProfileMenu(Menu):
 
             profile = Profile(
                 id,
-                file_path,
                 name
             )
 
