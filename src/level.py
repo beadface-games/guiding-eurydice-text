@@ -267,7 +267,8 @@ class TextLevel(Level):
 
     def phase(self) -> Phase:
         if self.orpheus_only or \
-            (self.level.state == self.level.LevelState.READY):
+            (self.level.state == self.level.LevelState.READY) or \
+            (self.level.state == self.level.LevelState.ORPHEUS_FATAL):
             return self.Phase.ORPHEUS
 
         if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
@@ -430,17 +431,25 @@ class TextLevel(Level):
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
         if not self.debug:
             self.text_utility.clear_screen()
-            print(self.text_utility.prose_screen(lines=self.success_text) if len(self.success_text) > 1 else print(self.text_utility.center_text(lines=self.success_text)))
+
+            if len(self.success_text) > 1:
+                print(self.text_utility.prose_screen(lines=self.success_text))
+            else:
+                print(self.text_utility.center_text(lines=self.success_text))
+
             time.sleep(linger_time_s)
             self.text_utility.wait_for_enter()
         else:
-            print(self.text_utility.prose_screen(lines=self.success_text) if len(self.success_text) > 1 else print(self.text_utility.center_text(lines=self.success_text)))
+            if len(self.success_text) > 1:
+                print(self.text_utility.prose_screen(lines=self.success_text))
+            else:
+                print(self.text_utility.center_text(lines=self.success_text))
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
         if not self.debug:
             self.text_utility.clear_screen()
-            print(self.text_utility.(fail_msg))
+            print(self.text_utility.center_text(fail_msg))
             time.sleep(linger_time_s)
             self.text_utility.wait_for_enter()
         else:
