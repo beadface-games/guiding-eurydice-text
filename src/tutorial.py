@@ -43,10 +43,10 @@ class TutorialPlayer:
         lyre: Lyre,
         lines: t.List[str],
         lyre_highlight_mode: t.Optional[LyreHighlightMode] = LyreHighlightMode.NO_HIGHLIGHT,
-        lyre_highlight_color: t.Optional[str] = "\x1b[33m",
+        lyre_highlight_color: t.Optional[str] = TextUtility.YELLOW,
     ):
         def _highlight_note(note: Note) -> str:
-            term_highlight = "" if lyre_highlight_mode == LyreHighlightMode.NO_HIGHLIGHT else "\x1b[0m"
+            term_highlight = TextUtility.RESET if lyre_highlight_mode != LyreHighlightMode.NO_HIGHLIGHT else ""
             if lyre_highlight_mode == LyreHighlightMode.HIGHLIGHT_ALL:
                 return lyre_highlight_color + str(note) + term_highlight
 
@@ -57,7 +57,7 @@ class TutorialPlayer:
             return f"{name_str} ({val_str}) - {count_str} remaining"
         
         def _highlight_text(text: str) -> str:
-            term_highlight = "\x1b[0m" if lyre_highlight_mode == LyreHighlightMode.HIGHLIGHT_ALL else ""
+            term_highlight = TextUtility.RESET if lyre_highlight_mode != LyreHighlightMode.NO_HIGHLIGHT else ""
             txt_highlight = lyre_highlight_color if lyre_highlight_mode == LyreHighlightMode.HIGHLIGHT_ALL else ""
             return txt_highlight + text + term_highlight
         
@@ -70,18 +70,18 @@ class TutorialPlayer:
                 note_len = len(str(lyre.notes[i]))
 
             highlighted_note = _highlight_note(lyre.notes[i])
-            res += highlighted_note + " \x1b[35m|\x1b[0m " + _highlight_text(lines[i]) + "\n"
+            res += highlighted_note + " " + TextUtility.magenta("|") + " " + _highlight_text(lines[i]) + "\n"
             i += 1
         
         if i < len(lyre.notes):
             while i < len(lyre.notes):
                 highlighted_note = _highlight_note(lyre.notes[i])
-                res += highlighted_note + " \x1b[35m|\x1b[0m\n"
+                res += highlighted_note + " " + TextUtility.magenta("|") + "\n"
                 i += 1
         
         if i < len(lines):
             while i < len(lines):
-                res += (" " * note_len) + " \x1b[35m|\x1b[0m " + _highlight_text(lines[i]) + "\n"
+                res += (" " * note_len) + " " + TextUtility.magenta("|") + " " + _highlight_text(lines[i]) + "\n"
                 i += 1
                 
         return res
@@ -94,14 +94,15 @@ class TutorialPlayer:
         requirement_line = ""
 
         if curr_phase == level.Phase.ORPHEUS:
-            requirement_line += "Orpheus" 
+            requirement_line += "You" 
         elif curr_phase == level.Phase.DEDUCTION:
             requirement_line += level.challenge_name
         
         requirement_line += " "
         requirement_verb = level.REQUIREMENT_VERBS[level.requirement_verb_idx % len(level.REQUIREMENT_VERBS)]
 
-        if curr_phase == level.Phase.DEDUCTION and level.challenge_number > 1:
+        if (curr_phase == level.Phase.DEDUCTION and level.challenge_number > 1) \
+            or (curr_phase == level.Phase.ORPHEUS):
             requirement_line += requirement_verb.plur()
         else:
             requirement_line += requirement_verb.sing()
@@ -164,32 +165,32 @@ class TutorialPlayer:
             ]
 
             hymen_wedding_lines_top = [
-                "From Crete, \x1b[33mHymen\x1b[0m, dressed in yellow garments,",
+                "From Crete, " + TextUtility.yellow("Hymen") + ", dressed in yellow garments,",
                 "flew through vast expanses of the air",
                 "and moved to regions of the Cicones,",
                 "summoned there by the voice of Orpheus.",
             ]
             
             hymen_wedding_lines_bottom = [
-                "\x1b[33mHymen is the god of marriage.\x1b[0m"
+                TextUtility.yellow("Hymen is the god of marriage.")
             ]
 
             orpheus_wedding_lines_top = [
                 "From Crete, Hymen, dressed in yellow garments,",
                 "flew through vast expanses of the air",
                 "and moved to regions of the Cicones,",
-                "summoned there by the voice of \x1b[34mOrpheus\x1b[0m.", 
+                "summoned there by the voice of " + TextUtility.blue("Orpheus") + ".", 
             ]
 
             orpheus_wedding_lines_bottom = [
-                "\x1b[34mThat's you. You are from Thrace.\x1b[0m",
-                "\x1b[34mYour father is Apollo, the god of music and poetry.\x1b[0m",
-                "\x1b[34mYour mother is Calliope, one of the nine muses.\x1b[0m",
+                TextUtility.blue("That's you. You are from Thrace."),
+                TextUtility.blue("Your father is Apollo, the god of music and poetry."),
+                TextUtility.blue("Your mother is Calliope, one of the nine muses."),
             ]
 
             failed_torch_lines = [
                 "His trip was futile. Although he did attend",
-                "\x1b[34mOrpheus\x1b[0m's wedding, he did not speak",
+                TextUtility.blue("Orpheus") + "'s wedding, he did not speak",
                 "his usual words, or have a joyful face,",
                 "or bring good luck. Even the torch he held",
                 "spluttered with smoke, making his eyes water,",
@@ -198,16 +199,16 @@ class TutorialPlayer:
 
             death_lines = [
                 "What happened afterwards was even worse",
-                "than any omen, for \x1b[32mEurydice\x1b[0m,",
+                "than any omen, for " + TextUtility.green("Eurydice"),
                 "Orpheus's new bride, while wandering",
                 "through a meadow with a crowd of naiads,",
                 "was bitten on the ankle by a snake.",
             ]
 
-            death_line = "\x1b[31mShe collapsed and died.\x1b[0m"
+            death_line = TextUtility.red("She collapsed and died.")
 
             mourning_lines = [
-                "\x1b[34mThe Thracian poet\x1b[0m,",
+                TextUtility.blue("The Thracian poet") + ",",
                 "after he had had enough of mourning",
                 "in the upper world, dared to travel down",
                 "the Taenarian gate to the river Styx,",
@@ -244,7 +245,7 @@ class TutorialPlayer:
     ):
         level_lines = [
             "You will need to pass through many obstacles and foes to rescue your wife.",
-            "Each encounter will look like this."
+            "Each encounter will look like this..."
         ]
 
         lyre_lines = [
@@ -256,46 +257,35 @@ class TutorialPlayer:
         ]
 
         note_name_lines = [
-            "Each note has a \x1b[33mname\x1b[0m.",
-            "To play a note, you type the note's \x1b[33mname\x1b[0m",
-            "and then press <Enter>.",
-            "Careful when you type—if you type a nonexistent",
-            "note's \x1b[33mname\x1b[0m too many times, you could ",
-            "\x1b[31mbreak a string\x1b[0m.",
-            "",
-            "How many times is too many? You won't know",
-            "until \x1b[31mit's too late\x1b[0m."
+            "Each note has a " + TextUtility.yellow("name") + ".",
+            "To play a note, enter its " + TextUtility.yellow("name") + ".",
+            "Take care: if you attempt to play a",
+            "nonexistent note, you could " + TextUtility.red("break a string") + ".",
         ]
 
         note_value_lines = [
-            "Each note also has a \x1b[33mvalue\x1b[0m.",
-            "When you play a note by entering its name,",
-            "the \x1b[33mvalue\x1b[0m will be added to a \x1b[34mrunning sum\x1b[0m",
-            "displayed at the bottom of your screen.",
+            "Each note also has a " + TextUtility.yellow("value") + ".",
+            "When you play a note, its " + TextUtility.yellow("value") + " will be added to your ",
+            TextUtility.blue("melody") + ".",
         ]
 
         note_remaining_lines = [
-            "Each note also has a \x1b[33mlimit\x1b[0m on how many times you",
-            "may play it. If you try to play an exhausted note",
-            "too many times, you could \x1b[31mbreak a string\x1b[0m.",
-            "",
-            "How many times is too many? You won't know until",
-            "\x1b[31mit's too late\x1b[0m."
+            "Each note also has a " + TextUtility.yellow("limit") + " on how many times it",
+            "can be played. If you try to play an exhausted note",
+            "too many times, you could " + TextUtility.red("break a string") + ".",
         ]
 
         target_value_lines = [
-            "You want to play notes that add up to the \x1b[34mtarget sum\x1b[0m",
+            "You want to play notes that add up to the " + TextUtility.blue("song you"),
             "You can play as many notes as you like",
-            "to reach the \x1b[34msum\x1b[0m. Just make sure not to",
-            "overplay \x1b[31mexhausted\x1b[0m notes.",
-            "Your \x1b[34mtotal\x1b[0m will be shown at the bottom of the screen."
+            "to reach the " + TextUtility.blue("song") + ". Just make sure not to",
+            "overplay " + TextUtility.red("exhausted") + " notes.",
         ]
 
         finishing_lines = [
             "Once you are satisfied with your song and",
-            "would like to submit it (hopefully once you've",
-            "reached the \x1b[34mtarget sum\x1b[0m),",
-            "press X and then <Enter> to finish playing.",
+            "would like to finish playing, press X and ",
+            "then <Enter>.",
             "",
             "Give it a try!"
         ]
@@ -312,9 +302,9 @@ class TutorialPlayer:
                 level.level.lyre,
                 lyre_lines,
                 LyreHighlightMode.HIGHLIGHT_ALL,
-                lyre_highlight_color="\x1b[33m"
+                lyre_highlight_color=TextUtility.YELLOW
                 ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum()
             self.text_utility.wait_for_enter()
@@ -325,9 +315,9 @@ class TutorialPlayer:
                 level.level.lyre,
                 note_name_lines,
                 LyreHighlightMode.NOTE_NAMES,
-                lyre_highlight_color="\x1b[33m"
+                lyre_highlight_color=TextUtility.YELLOW
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum()
             self.text_utility.wait_for_enter()
@@ -338,9 +328,9 @@ class TutorialPlayer:
                 level.level.lyre,
                 note_value_lines,
                 LyreHighlightMode.NOTE_VALUES,
-                lyre_highlight_color="\x1b[33m"
+                lyre_highlight_color=TextUtility.YELLOW
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum(
                 highlight_color="\x1b[34m",
@@ -354,28 +344,28 @@ class TutorialPlayer:
                 level.level.lyre,
                 note_remaining_lines,
                 LyreHighlightMode.NOTE_COUNT,
-                lyre_highlight_color="\x1b[33m"
+                lyre_highlight_color=TextUtility.YELLOW
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum()
             self.text_utility.wait_for_enter()
 
             self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
             req_line = self.get_requirement(level)
-            line_to_add = f"shown after the line \"\x1b[36m{req_line.split(":")[0]}\x1b[0m\"."
+            line_to_add =     TextUtility.blue("need") + ", shown after the line \"" + TextUtility.cyan(req_line.split(":")[0]) + "\"."
             target_value_lines.insert(1, line_to_add)
+            level.print_header(omit_description=True)
             print(self.get_lyre_with_lines(
                 level.level.lyre,
                 target_value_lines,
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color=""
             ))
-            level.print_lyre_prompt(omit_phase=True)
-            self.print_requirement(level, req_line, highlight_color="\x1b[36m")
+            print("=" * self.text_utility.get_term_width())
+            print(TextUtility.cyan(req_line.split(":")[0]) + ":" + TextUtility.blue(req_line.split(":")[1]))
             self.print_mock_sum(
-                highlight_color="\x1b[34m",
+                highlight_color="",
                 highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
             )
             self.text_utility.wait_for_enter()
@@ -388,10 +378,10 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum(
-                highlight_color="\x1b[34m",
+                highlight_color="",
                 highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
             )
             self.text_utility.wait_for_enter()
@@ -414,49 +404,44 @@ class TutorialPlayer:
         deduction_tutorial_lines = [
             "You aren't the only one who is moved by your music.",
             "It has a tremendous power to persuade those around you.",
-            f"Try and use it now to ask \x1b[36m{level.challenge_name}\x1b[0m",
+            f"Try and use it now to ask {TextUtility.cyan(level.challenge_name)}",
             "to help you."
         ]
 
         deduction_sum_lines = [
             "You will play your lyre as before, but this time,",
-            "your \x1b[34mtarget sum\x1b[0m is a mystery."
+            "the " + TextUtility.blue("desired song") + " is a mystery."
         ]
 
         deduction_addend_lines = [
-            "However, you do know \x1b[34mhow many notes\x1b[0m",
-            f"\x1b[36m{level.challenge_name}\x1b[0m wants to hear. Make sure your",
-            "song includes that many notes before pressing X",
-            "followed by <Enter> to finish playing."
+            "However, you do know " + TextUtility.blue("how many notes"),
+            f"{TextUtility.cyan(level.challenge_name)} wants to hear. Make sure your song",
+            "includes that many notes before you finish playing."
         ]
 
         deduction_fail_lines = [
-            "Because you don't know your \x1b[34mtarget sum\x1b[0m,",
-            "you have more than one chance to play the song",
-            f"that \x1b[36m{level.challenge_name}\x1b[0m wants",
-            "to hear. You don't want to fail too many times,",
-            "or else you will \x1b[31mrun out of chances\x1b[0m.",
-            "",
-            "How many chances do you have?",
-            "You won't know until it's \x1b[31mtoo late\x1b[0m."
+            "you will have more than one chance to play.",
+            "Don't fail too many times, or else you will ",
+            TextUtility.red("run out of chances") + ".",
         ]
 
         deduction_deduce_lines = [
             "It's important to pay attention to the songs",
-            "that \x1b[31mfail\x1b[0m because you can use",
-            "that information to deduce the song that will",
-            "\x1b[32msucceed\x1b[0m."
+            "that " + TextUtility.red("fail") + " because that information can help you deduce",
+            "the song that will " + TextUtility.green("succeed") + "."
         ]
 
         thwart_lines = [
             "Sometimes, in the course of playing an incorrect song",
-            "you will \x1b[31mexhaust\x1b[0m a note needed for the correct song.",
-            "In that case, the gods will have mercy on you and",
-            "\x1b[32mrestore\x1b[0m the notes you need on your lyre. You will be",
-            "notified when this happens.",
+            "you will " + TextUtility.red("exhaust") + " a note needed "
+            "for the correct song.",
             "",
-            "This is also information you can use to deduce the ",
-            f"song that \x1b[36m{level.challenge_name}\x1b[0m wants to hear."
+            "In that case, the gods will have mercy on you and",
+            TextUtility.green("restore") + " the notes you need on your lyre. You will",
+            "be notified when this happens.",
+            "",
+            "This information can also be used to deduce the ",
+            "song that " + TextUtility.cyan(level.challenge_name) + " wants to hear."
         ]
 
         try_lines = [
@@ -480,12 +465,12 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             req_lines = self.get_requirement(level).split(" ")
-            req_line = "\x1b[36m" + req_lines[0] + "\x1b[0m " + " ".join(req_lines[1:len(req_lines) - 1]) + " \x1b[34m" + req_lines[len(req_lines) - 1] +  "\x1b[0m"
+            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
             print(req_line)
             self.print_mock_sum(
-                highlight_color="\x1b[34m",
+                highlight_color="",
                 highlight_mode=SumHighlightMode.SUM,
                 phase=TextLevel.Phase.DEDUCTION,
                 level=level,
@@ -500,12 +485,12 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             req_lines = self.get_requirement(level).split(" ")
-            req_line = "\x1b[36m" + req_lines[0] + "\x1b[0m " + " ".join(req_lines[1:len(req_lines)])
+            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
             print(req_line)
             self.print_mock_sum(
-                highlight_color="\x1b[34m",
+                highlight_color=TextUtility.BLUE,
                 highlight_mode=SumHighlightMode.ADDENDS,
                 phase=TextLevel.Phase.DEDUCTION,
                 level=level,
@@ -513,6 +498,9 @@ class TutorialPlayer:
             self.text_utility.wait_for_enter()
 
             self.text_utility.clear_screen()
+            req_line = self.get_requirement(level)
+            line_to_add = "Because you don't know the " + TextUtility.blue("song") + f" {TextUtility.cyan(req_line.split(":")[0])}, "
+            deduction_fail_lines.insert(0, line_to_add)
             level.print_header()
             print(self.get_lyre_with_lines(
                 level.level.lyre,
@@ -520,12 +508,12 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             req_lines = self.get_requirement(level).split(" ")
-            req_line = "\x1b[36m" + req_lines[0] + "\x1b[0m " + " ".join(req_lines[1:len(req_lines)])
+            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
             print(req_line)
             self.print_mock_sum(
-                highlight_color="\x1b[34m",
+                highlight_color="",
                 highlight_mode=SumHighlightMode.SUM,
                 phase=TextLevel.Phase.DEDUCTION,
                 level=level,
@@ -540,7 +528,7 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum(
                 phase=TextLevel.Phase.DEDUCTION,
@@ -556,9 +544,9 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             req_lines = self.get_requirement(level).split(" ")
-            req_line = "\x1b[36m" + req_lines[0] + "\x1b[0m " + " ".join(req_lines[1:len(req_lines)])
+            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
             print(req_line)
             self.print_mock_sum(
                 phase=TextLevel.Phase.DEDUCTION,
@@ -574,7 +562,7 @@ class TutorialPlayer:
                 LyreHighlightMode.NO_HIGHLIGHT,
                 lyre_highlight_color="",
             ))
-            level.print_lyre_prompt(omit_phase=True)
+            print("=" * self.text_utility.get_term_width())
             level.print_requirement()
             self.print_mock_sum(
                 phase=TextLevel.Phase.DEDUCTION,

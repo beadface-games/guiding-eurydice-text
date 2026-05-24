@@ -12,10 +12,10 @@ import typing as t
 from guiding_eurydice_core.src.difficulty import Difficulty
 from guiding_eurydice_core.src.lyre import Lyre, Note
 from guiding_eurydice_core.src.level import Goal, Level
-from src._utils import resource_path, RequirementVerb, TextUtility
+from src._utils import UserDataManager, RequirementVerb, TextUtility
 
 
-DIFFICULTY_JSON_PATH = resource_path("guiding_eurydice_levels/difficulty_settings.json")
+DIFFICULTY_JSON_PATH = UserDataManager().resource_path("guiding_eurydice_levels/difficulty_settings.json")
 
 class TextLevel(Level):
     class QuitGameException(Exception):
@@ -372,14 +372,15 @@ class TextLevel(Level):
         requirement_line = ""
 
         if curr_phase == self.Phase.ORPHEUS:
-            requirement_line += "Orpheus" 
+            requirement_line += "You" 
         elif curr_phase == self.Phase.DEDUCTION:
             requirement_line += self.challenge_name
         
         requirement_line += " "
         requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
 
-        if curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1:
+        if (curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1) or \
+            (curr_phase == self.Phase.ORPHEUS):
             requirement_line += requirement_verb.plur()
         else:
             requirement_line += requirement_verb.sing()

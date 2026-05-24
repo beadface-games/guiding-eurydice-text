@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+import os
 import pathlib
 import random
 import re
@@ -8,14 +10,56 @@ import textwrap
 import time
 import typing as t
 
-def resource_path(relative_path: str) -> pathlib.Path:
-    if getattr(sys, "frozen", False):
-        return pathlib.Path(sys._MEIPASS) / relative_path
+from colorama import just_fix_windows_console
 
-    return pathlib.Path(__file__).resolve().parents[2] / relative_path
+APP_NAME = "GuidingEurydice"
 
+class UserDataManager:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_user_data_dir(app_name: str = APP_NAME) -> pathlib.Path:
+        if sys.platform == "win32":
+            base = os.getenv("APPDATA")
+            base = pathlib.Path(base) if base else pathlib.Path.home() / "AppData" / "Roaming"
+        elif sys.platform == "darwin":
+            base = Path.home() / "Library" / "Application Support"
+        else:
+            base = os.getenv("XDG_DATA_HOME")
+            base = Path(base) if base else Path.home() / ".local" / "share"
+
+        app_dir = base / app_name
+        app_dir.mkdir(parents=True, exist_ok=True)
+        return app_dir
+
+    def resource_path(self, relative_path: str) -> pathlib.Path:
+        if getattr(sys, "frozen", False):
+            return pathlib.Path(sys._MEIPASS) / relative_path
+
+        return pathlib.Path(__file__).resolve().parents[2] / relative_path
+    
+    def get_profiles_dir(self, app_name: str = APP_NAME) -> pathlib.Path:
+        profiles_dir = UserDataManager.get_user_data_dir(app_name) / "profiles"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        return profiles_dir
+    
+    def get_metadata_dir(self, app_name: str = APP_NAME) -> pathlib.Path:
+        metadata_dir = UserDataManager.get_user_data_dir(app_name) / "metadata"
+        metadata_dir.mkdir(parents=True, exist_ok=True)
+        return metadata_dir
+
+    def get_metadata_file(self) -> pathlib.Path:
+        return self.get_metadata_dir() / "metadata.json"
+    
+udm = UserDataManager()
 CONTINUE_PROMPT = "Press <Enter> to continue."
 DEFAULT_LEVEL_DATA_DIR = "guiding_eurydice_levels/levels"
+
+DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
+DEFAULT_PROFILE_DATA_DIR = udm.get_profiles_dir()
+DEFAULT_METADATA_DIR = udm.get_metadata_dir()
+DEFAULT_METADATA_FILE = udm.get_metadata_file()
 
 class RequirementVerb():
         def __init__(
@@ -40,6 +84,138 @@ class RequirementVerb():
 
 class TextUtility:
     ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+    def __init__():
+        pass
+
+    @staticmethod
+    def is_probably_old_windows_console() -> bool:
+        """
+        Heuristic detection for old Windows console hosts.
+
+        Returns True if we're probably running in:
+        - old blue PowerShell
+        - old cmd.exe host
+        - legacy conhost
+
+        Returns False for:
+        - Windows Terminal
+        - modern terminal environments
+        - non-Windows systems
+        """
+
+        if os.name != "nt":
+            return False
+
+        # Windows Terminal sets this env var.
+        if os.environ.get("WT_SESSION"):
+            return False
+
+        # VSCode terminal
+        if os.environ.get("TERM_PROGRAM") == "vscode":
+            return False
+
+        # Some modern terminals expose TERM.
+        term = os.environ.get("TERM", "").lower()
+        if "xterm" in term or "ansi" in term:
+            return False
+
+        return True
+    
+    RESET = "\x1b[0m" 
+    RED = "\x1b[91m" if is_probably_old_windows_console() else "\x1b[31m"
+    GREEN = "\x1b[92m" if is_probably_old_windows_console() else "\x1b[32m"
+    YELLOW = "\x1b[93m" if is_probably_old_windows_console() else "\x1b[33m"
+    BLUE = "\x1b[94m" if is_probably_old_windows_console() else "\x1b[34m"
+    MAGENTA = "\x1b[95m" if is_probably_old_windows_console() else "\x1b[35m"
+    CYAN = "\x1b[96m" if is_probably_old_windows_console() else "\x1b[36m"
+    BOLD = "1"
+    
+    @staticmethod
+    def red(s: str) -> str:
+        return TextUtility.RED + s + TextUtility.RESET
+
+    @staticmethod
+    def green(s: str) -> str:
+        return TextUtility.GREEN + s + TextUtility.RESET
+    
+    @staticmethod
+    def yellow(s: str) -> str:
+        return TextUtility.YELLOW + s + TextUtility.RESET
+    
+    @staticmethod
+    def blue(s: str) -> str:
+        return TextUtility.BLUE + s + TextUtility.RESET
+    
+    @staticmethod
+    def magenta(s: str) -> str:
+        return TextUtility.MAGENTA + s + TextUtility.RESET
+
+    @staticmethod
+    def cyan(s: str) -> str:
+        return TextUtility.CYAN + s + TextUtility.RESET
+    
+    @staticmethod
+    def detect_and_warn_old_console():
+        if TextUtility.is_probably_old_windows_console():
+            just_fix_windows_console()
+
+            if os.name == "nt":
+                os.system("chcp 65001 > nul")
+
+            if os.path.exists(DEFAULT_METADATA_FILE):
+                with open(DEFAULT_METADATA_FILE, "r") as f:
+                    data = json.load(f)
+                    if ("has_viewed_old_console_warning" in data.keys()) and (isinstance(data["has_viewed_old_console_warning"], bool)) and data["has_viewed_old_console_warning"]:
+                        return
+                    
+            try:
+                print()
+                print("ATTENTION: do the words below occur in the color they name?")
+                print(
+                    "\x1b[91mRED\x1b[0m",
+                    "\x1b[93mYELLOW\x1b[0m",
+                    "\x1b[92mGREEN\x1b[0m",
+                    "\x1b[94mBLUE\x1b[0m",
+                    "\x1b[95mMAGENTA\x1b[0m",
+                    "\x1b[96mCYAN\x1b[0m"
+                )
+                print()
+                print("If not, or if they are difficult to read a modern terminal is recommended.")
+                print("Windows Terminal is free from the Microsoft Store:")
+                print("https://apps.microsoft.com/detail/9N0DX20HK701")
+                print("After you install it, open it and run the following command:")
+                print("cd <path\to\GuidingEurydice.exe>")
+                print("Then run this next command: .\GuidingEurydice.exe")
+                print()
+                print("It is NOT recommended to play on your current console.")
+                print("If you proceed here, some text may be unreadable.")
+                print("If you wish to proceed with your current setup, press <Enter>.")
+                print("Otherwise, press Q to quit.")
+                i = input("> ")
+                if i.upper() == "Q":
+                    print("Goodbye.")
+                    raise SystemExit(0)
+            except KeyboardInterrupt:
+                raise SystemExit(0)
+            
+            d : t.Dict[str, t.Any] = {}
+            d["has_viewed_old_console_warning"] = True
+
+            with open(DEFAULT_METADATA_FILE, 'a') as f:
+                json.dump(d, f, indent=2)            
+
+    @staticmethod
+    def set_utf_8_encoding():
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8")
+
+    @staticmethod
+    def fix_formatting():
+        TextUtility.detect_and_warn_old_console()
+        TextUtility.set_utf_8_encoding()
 
     def __init__(
         self,

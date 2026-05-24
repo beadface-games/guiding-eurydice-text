@@ -2,43 +2,18 @@
 import json
 import os
 import pathlib
-import sys
 import typing as t
 
 from datetime import datetime as dt
 
 from src.level import TextLevel
-from src._utils import DEFAULT_LEVEL_DATA_DIR, resource_path, TextUtility
-
-from pathlib import Path
-import sys
-
-import sys
-from pathlib import Path
-
-DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
-APP_NAME = "GuidingEurydice"
-
-def get_user_data_dir(app_name: str = APP_NAME) -> pathlib.Path:
-    if sys.platform == "win32":
-        base = os.getenv("APPDATA")
-        base = pathlib.Path(base) if base else pathlib.Path.home() / "AppData" / "Roaming"
-    elif sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support"
-    else:
-        base = os.getenv("XDG_DATA_HOME")
-        base = Path(base) if base else Path.home() / ".local" / "share"
-
-    app_dir = base / app_name
-    app_dir.mkdir(parents=True, exist_ok=True)
-    return app_dir
-
-def get_profiles_dir(app_name: str = APP_NAME) -> pathlib.Path:
-    profiles_dir = get_user_data_dir(app_name) / "profiles"
-    profiles_dir.mkdir(parents=True, exist_ok=True)
-    return profiles_dir
-
-DEFAULT_PROFILE_DATA_DIR = get_profiles_dir()
+from src._utils import (
+    DATE_FORMAT_STR,
+    DEFAULT_LEVEL_DATA_DIR,
+    DEFAULT_PROFILE_DATA_DIR,
+    TextUtility,
+    UserDataManager,
+)
 
 class Stats():
     def __init__(
@@ -107,6 +82,7 @@ class LevelInfo():
         stats: t.Optional[LevelInfo.Stats] = None,
         locked: t.Optional[bool] = True,
         debug: t.Optional[bool] = False,
+        user_data_manager: t.Optional[UserDataManager] = UserDataManager()
     ):
         if not id:
             raise ValueError(f"No ID provided for profile at path {level_path}")
@@ -114,8 +90,9 @@ class LevelInfo():
         self.id = id
         self.level_path = level_path or pathlib.Path(DEFAULT_LEVEL_DATA_DIR).joinpath(pathlib.Path("level" + str(id) + ".json"))
         self.title = title 
+        self.user_data_manager = user_data_manager
 
-        if not os.path.exists(resource_path(self.level_path)):
+        if not os.path.exists(self.user_data_manager.resource_path(self.level_path)):
             raise LevelInfo.LevelMissingException(f"Unable to find level at {self.level_path}")
         
         self.tutorial_complete = tutorial_complete
@@ -187,7 +164,7 @@ class LevelInfo():
 
     def level(self) -> TextLevel:
         return TextLevel.from_json(
-            json_path=resource_path(self.level_path),
+            json_path=self.user_data_manager.resource_path(self.level_path),
             debug=self.debug,
         )
 
@@ -206,6 +183,7 @@ class Profile():
         level_data_dir: t.Optional[pathlib.Path] = None,
         has_viewed_intro: t.Optional[bool] = False,
         debug: t.Optional[bool] = False,
+        user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
     ):
         self.id = id
         self.file_path = file_path
@@ -216,6 +194,7 @@ class Profile():
         self.level_data_dir = level_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
         self.has_viewed_intro = has_viewed_intro
         self.debug = debug
+        self.user_data_manager = user_data_manager
 
         self.text_utility = TextUtility(debug=self.debug)
 
@@ -335,11 +314,11 @@ class Profile():
         level_infos = {}
         level_files = []
         
-        for _, _, filenames in os.walk(resource_path(self.level_data_dir)):
+        for _, _, filenames in os.walk(self.user_data_manager.resource_path(self.level_data_dir)):
             level_files.extend(filenames)
 
         if len(level_files) < 1:
-            raise FileNotFoundError(f"Couldn't find level file {str(resource_path())} in {str(resource_path(self.level_data_dir))}")
+            raise FileNotFoundError(f"Couldn't find level files in  {str(self.user_data_manager.resource_path(self.level_data_dir))}")
         
         for file in level_files:
             if file.startswith("level") and file.endswith(".json"):
@@ -377,7 +356,7 @@ class Profile():
         self.level_infos = level_infos
 
         if len(self.level_infos) < 1:
-            raise ValueError(f"Failed to load any levels at {str(resource_path(self.level_data_dir))}")
+            raise ValueError(f"Failed to load any levels at {str(self.user_data_manager.resource_path(self.level_data_dir))}")
 
         self.level_infos[1].unlock()
 

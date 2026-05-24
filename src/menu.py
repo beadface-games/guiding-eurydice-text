@@ -12,7 +12,7 @@ import typing as t
 from src.level import TextLevel
 from src.profile import DEFAULT_LEVEL_DATA_DIR, DEFAULT_PROFILE_DATA_DIR, Profile
 from src.tutorial import TutorialPlayer
-from src._utils import resource_path, TextUtility
+from src._utils import UserDataManager, TextUtility
 
 type MenuAction = t.Callable[[t.Any], t.Union[LevelMenu, None]]
 
@@ -55,9 +55,12 @@ class ProfileMenu(Menu):
         profile_data_dir: t.Optional[pathlib.Path] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
+        user_data_manager: t.Optional[UserDataManager] = UserDataManager()
     ):
         self.rng = rng or random.Random()
         super().__init__(debug=debug, rng=self.rng)
+
+        self.user_data_manager = user_data_manager
         self.level_data_dir = save_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
         self.profile_data_dir = profile_data_dir or pathlib.Path(DEFAULT_PROFILE_DATA_DIR)
 
@@ -308,7 +311,7 @@ class ProfileMenu(Menu):
 
     def create_new_profile(self) -> LevelMenu:
         id = self.get_next_id()
-        file_path = resource_path(self.level_data_dir.joinpath("{:02d}".format(id) + "_profile.json"))
+        file_path = self.user_data_manager.resource_path(self.level_data_dir.joinpath("{:02d}".format(id) + "_profile.json"))
         
         try:
             self.text_utility.clear_screen()
@@ -449,7 +452,7 @@ class LevelMenu(Menu):
                 self.profile.has_viewed_intro = True
                 self.profile.save()
 
-            choice = self.text_utility.menu_screen(lines=self.get_level_strs(), is_submenu=True, additional_prompt=f"Welcome, \x1b[34m{self.profile.name}\x1b[0m.")
+            choice = self.text_utility.menu_screen(lines=self.get_level_strs(), is_submenu=True, additional_prompt=f"Welcome, {TextUtility.blue(self.profile.name)}.")
             valid, err = self.validate_level_selection(choice)
 
             while not valid:
