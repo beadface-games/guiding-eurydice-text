@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import random
 import typing as t
 
@@ -8,8 +6,151 @@ from enum import Enum
 from guiding_eurydice_core.src.lyre import Lyre, Note
 
 from src.level import TextLevel
-from src._utils import TextUtility, CONTINUE_PROMPT
+from src._utils import CONTINUE_PROMPT, B_FOR_BACK_STR, Q_TO_QUIT_STR, PROMPT_STR, TextUtility
 
+# region intro lines
+
+INTRO_LINES_1 = [ 
+    "From Crete, Hymen, dressed in yellow garments,",
+    "flew through vast expanses of the air",
+    "and moved to regions of the Cicones,",
+    "summoned there by the voice of Orpheus.",
+]
+
+INTRO_LINES_2 = [
+    "From Crete, " + TextUtility.yellow("Hymen") + ", dressed in yellow garments,",
+    "flew through vast expanses of the air",
+    "and moved to regions of the Cicones,",
+    "summoned there by the voice of Orpheus.",
+]
+
+FOOTNOTES_2 = [
+    TextUtility.yellow("Hymen is the god of marriage.")
+]
+
+INTRO_LINES_3 = [
+    "From Crete, Hymen, dressed in yellow garments,",
+    "flew through vast expanses of the air",
+    "and moved to regions of the Cicones,",
+    "summoned there by the voice of " + TextUtility.blue("Orpheus") + ".", 
+]
+
+FOOTNOTES_3 = [
+    TextUtility.blue("That's you. You are from Thrace."),
+    TextUtility.blue("Your father is Apollo, the god of music and poetry."),
+    TextUtility.blue("Your mother is Calliope, one of the nine muses."),
+]
+
+INTRO_LINES_4 = [
+    "His trip was futile. Although he did attend",
+    TextUtility.blue("Orpheus") + "'s wedding, he did not speak",
+    "his usual words, or have a joyful face,",
+    "or bring good luck. Even the torch he held",
+    "spluttered with smoke, making his eyes water,",
+    "and waving it around produced no flames."
+]
+
+INTRO_LINES_5 = [
+    "What happened afterwards was even worse",
+    "than any omen, for " + TextUtility.green("Eurydice"),
+    "Orpheus's new bride, while wandering",
+    "through a meadow with a crowd of naiads,",
+    "was bitten on the ankle by a snake.",
+]
+
+INTRO_LINES_6 = TextUtility.red("She collapsed and died.")
+
+INTRO_LINES_7 = [
+    TextUtility.blue("The Thracian poet") + ",",
+    "after he had had enough of mourning",
+    "in the upper world, dared to travel down",
+    "the Taenarian gate to the river Styx,",
+    "to see if he could win the sympathy",
+    "of dead shades below.",
+] 
+
+# endregion
+
+# region Orpheus tutorial lines
+
+LEVEL_LINES = [
+    "You will need to pass through many obstacles and foes to rescue your wife.",
+    "Each encounter will look like this..."
+]
+
+LYRE_LINES = [
+    "This is your lyre. It is the only weapon you have.",
+    "Each line represents a note you can play.",
+    "",
+    "Your first song of each level will always be to calm",
+    "and reassure yourself."
+]
+
+NOTE_NAME_LINES = [
+    "Each note has a " + TextUtility.yellow("name") + ".",
+    "To play a note, enter its " + TextUtility.yellow("name") + ".",
+    "Take care: if you attempt to play a",
+    "nonexistent note, you could " + TextUtility.red("break a string") + ".",
+]
+
+NOTE_VALUE_LINES = [
+    "Each note also has a " + TextUtility.yellow("value") + ".",
+    "When you play a note, its " + TextUtility.yellow("value") + " will be added to your ",
+    TextUtility.blue("melody") + ".",
+]
+
+NOTE_REMAINING_LINES = [
+    "Each note also has a " + TextUtility.yellow("limit") + " on how many times it",
+    "can be played. If you try to play an exhausted note",
+    "too many times, you could " + TextUtility.red("break a string") + ".",
+]
+
+TARGET_VALUE_LINES = [
+    "You want to play notes that add up to the " + TextUtility.blue("song you"),
+    "You can play as many notes as you like",
+    "to reach the " + TextUtility.blue("song") + ". Just make sure not to",
+    "overplay " + TextUtility.red("exhausted") + " notes.",
+]
+
+FINISHING_LINES = [
+    "Once you are satisfied with your song and",
+    "would like to finish playing, press X and ",
+    "then <Enter>.",
+    "",
+    "Give it a try!"
+]
+
+# endregion
+
+# region deduction tutorial lines
+
+DEDUCTION_SUM_LINES = [
+    "You will play your lyre as before, but this time,",
+    "the " + TextUtility.blue("desired song") + " is a mystery."
+]
+
+DEDUCTION_FAIL_LINES = [
+    "you will have more than one chance to play.",
+    "Don't fail too many times, or else you will ",
+    TextUtility.red("run out of chances") + ".",
+]
+
+DEDUCTION_DEDUCE_LINES = [
+    "It's important to pay attention to the songs",
+    "that " + TextUtility.red("fail") + " because that information can help you deduce",
+    "the song that will " + TextUtility.green("succeed") + "."
+]
+
+TRY_LINES = [
+    "It may take some time to get a feel for this part",
+    "of your journey.",
+    "",
+    "Give it a try!"
+]
+
+# endregion
+
+# region highlight modes
 
 class LyreHighlightMode(Enum):
     NOTE_NAMES = 0
@@ -24,7 +165,9 @@ class SumHighlightMode(Enum):
     NO_HIGHLIGHT = 2
     HIGHLIGHT_ALL = 3
 
-class TutorialPlayer:
+# endregion
+
+class TutorialUtility:
     def __init__(
         self,
         debug: t.Optional[bool] = False,
@@ -126,14 +269,13 @@ class TutorialPlayer:
         print(highlight_color + requirement_line + highlight_term)
         level.requirement_verb_idx += 1
 
-    def print_mock_sum(
+    def get_mock_sum(
         self,
         highlight_color: t.Optional[str] = "",
         highlight_mode: t.Optional[SumHighlightMode] = SumHighlightMode.NO_HIGHLIGHT,
         phase: t.Optional[TextLevel.Phase] = TextLevel.Phase.ORPHEUS,
         level: t.Optional[TextLevel] = None,
-
-    ):
+    ) -> str:
         def _highlight(sum: str) -> str:
             if len(highlight_color) > 0:
                 highlight_term = "\x1b[0m" 
@@ -153,284 +295,351 @@ class TutorialPlayer:
             return sum
 
         mock_sum = "= 0" if phase == TextLevel.Phase.ORPHEUS else level.format_song_line([], 0)
-        print(_highlight(mock_sum))
+        return _highlight(mock_sum)
 
-    def play_intro(self):
-        try:
-            initial_wedding_lines = [ 
-                "From Crete, Hymen, dressed in yellow garments,",
-                "flew through vast expanses of the air",
-                "and moved to regions of the Cicones,",
-                "summoned there by the voice of Orpheus.",
-            ]
-
-            hymen_wedding_lines_top = [
-                "From Crete, " + TextUtility.yellow("Hymen") + ", dressed in yellow garments,",
-                "flew through vast expanses of the air",
-                "and moved to regions of the Cicones,",
-                "summoned there by the voice of Orpheus.",
-            ]
-            
-            hymen_wedding_lines_bottom = [
-                TextUtility.yellow("Hymen is the god of marriage.")
-            ]
-
-            orpheus_wedding_lines_top = [
-                "From Crete, Hymen, dressed in yellow garments,",
-                "flew through vast expanses of the air",
-                "and moved to regions of the Cicones,",
-                "summoned there by the voice of " + TextUtility.blue("Orpheus") + ".", 
-            ]
-
-            orpheus_wedding_lines_bottom = [
-                TextUtility.blue("That's you. You are from Thrace."),
-                TextUtility.blue("Your father is Apollo, the god of music and poetry."),
-                TextUtility.blue("Your mother is Calliope, one of the nine muses."),
-            ]
-
-            failed_torch_lines = [
-                "His trip was futile. Although he did attend",
-                TextUtility.blue("Orpheus") + "'s wedding, he did not speak",
-                "his usual words, or have a joyful face,",
-                "or bring good luck. Even the torch he held",
-                "spluttered with smoke, making his eyes water,",
-                "and waving it around produced no flames."
-            ]
-
-            death_lines = [
-                "What happened afterwards was even worse",
-                "than any omen, for " + TextUtility.green("Eurydice"),
-                "Orpheus's new bride, while wandering",
-                "through a meadow with a crowd of naiads,",
-                "was bitten on the ankle by a snake.",
-            ]
-
-            death_line = TextUtility.red("She collapsed and died.")
-
-            mourning_lines = [
-                TextUtility.blue("The Thracian poet") + ",",
-                "after he had had enough of mourning",
-                "in the upper world, dared to travel down",
-                "the Taenarian gate to the river Styx,",
-                "to see if he could win the sympathy",
-                "of dead shades below.",
-            ]    
-
-            self.text_utility.prose_screen(initial_wedding_lines)
-
-            self.text_utility.prose_screen(
-                hymen_wedding_lines_top,
-                hymen_wedding_lines_bottom,
-            )
-
-            self.text_utility.prose_screen(
-                orpheus_wedding_lines_top,
-                orpheus_wedding_lines_bottom,
-            )
-
-            self.text_utility.prose_screen(failed_torch_lines)
-
-            self.text_utility.prose_screen(death_lines)
-
-            self.text_utility.prose_screen([death_line])
-
-            self.text_utility.prose_screen(mourning_lines)
-        except KeyboardInterrupt:
-            lvl = TextLevel()
-            lvl.graceful_shutdown()
-
-    def play_orpheus_tutorial(
+    def pad_and_continue(
         self,
-        level: TextLevel
+        lines: t.List[str],
+        back_enabled: t.Optional[bool] = False,
+    ) -> str:
+        prompt_strs = [
+            CONTINUE_PROMPT,
+            Q_TO_QUIT_STR,
+            PROMPT_STR,
+        ]
+
+        if back_enabled:
+            prompt_strs.insert(
+                1,
+                B_FOR_BACK_STR
+            )
+
+        self.text_utility.print_padded_lines(lines, len(prompt_strs) - 1)
+        return input("\n".join(prompt_strs))
+    
+    def prose_screen(
+        self,
+        lines: t.List[str],
+        footnote_lines: t.Optional[t.List[str]] = None,
+        center_footnotes: t.Optional[bool] = False,
+        max_width: int = 64,
     ):
-        level_lines = [
-            "You will need to pass through many obstacles and foes to rescue your wife.",
-            "Each encounter will look like this..."
-        ]
+        if not self.debug:
+            self.clear_screen()
 
-        lyre_lines = [
-            "This is your lyre. It is the only weapon you have.",
-            "Each line represents a note you can play.",
-            "",
-            "Your first song of each level will always be to calm",
-            "and reassure yourself."
-        ]
+        term_width = self.get_term_width()
+        term_height = self.get_term_height()
 
-        note_name_lines = [
-            "Each note has a " + TextUtility.yellow("name") + ".",
-            "To play a note, enter its " + TextUtility.yellow("name") + ".",
-            "Take care: if you attempt to play a",
-            "nonexistent note, you could " + TextUtility.red("break a string") + ".",
-        ]
+        wrapped = self.text_utility.wrap_lines(lines, max_width)
+        footnote_wrapped = self.text_utility.wrap_lines(footnote_lines or [], max_width)
 
-        note_value_lines = [
-            "Each note also has a " + TextUtility.yellow("value") + ".",
-            "When you play a note, its " + TextUtility.yellow("value") + " will be added to your ",
-            TextUtility.blue("melody") + ".",
-        ]
+        block_width = max((self.text_utility.visible_len(line) for line in wrapped), default=0)
+        left_padding = max((term_width - block_width) // 2, 0)
 
-        note_remaining_lines = [
-            "Each note also has a " + TextUtility.yellow("limit") + " on how many times it",
-            "can be played. If you try to play an exhausted note",
-            "too many times, you could " + TextUtility.red("break a string") + ".",
-        ]
+        top_padding = max((term_height - len(wrapped)) // 2 - 2, 0)
+        print("\n" * top_padding, end="")
 
-        target_value_lines = [
-            "You want to play notes that add up to the " + TextUtility.blue("song you"),
-            "You can play as many notes as you like",
-            "to reach the " + TextUtility.blue("song") + ". Just make sure not to",
-            "overplay " + TextUtility.red("exhausted") + " notes.",
-        ]
+        for line in wrapped:
+            print((" " * left_padding) + line)
 
-        finishing_lines = [
-            "Once you are satisfied with your song and",
-            "would like to finish playing, press X and ",
-            "then <Enter>.",
-            "",
-            "Give it a try!"
-        ]
+        # Footnote area, near bottom.
+        prompt_reserved_lines = 2
+        footnote_gap = max(
+            term_height
+            - top_padding
+            - len(wrapped)
+            - len(footnote_wrapped)
+            - prompt_reserved_lines,
+            1,
+        ) - 1
 
-        try:
-            self.text_utility.clear_screen()
-            lvl_text = self.text_utility.center_text(lines=level_lines)
-            print(lvl_text)
-            self.text_utility.pad_and_continue(lvl_text.split("\n"))
+        print("\n" * footnote_gap, end="")
 
-            self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                lyre_lines,
-                LyreHighlightMode.HIGHLIGHT_ALL,
-                lyre_highlight_color=TextUtility.YELLOW
-                ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum()
-            self.text_utility.wait_for_enter()
+        if footnote_wrapped:
+            print("-" * term_width)
+            footnote_width = max((self.text_utility.visible_len(line) for line in footnote_wrapped), default=0)
+            footnote_left_padding = max((term_width - footnote_width) // 2, 0) if center_footnotes else 0
 
-            self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                note_name_lines,
-                LyreHighlightMode.NOTE_NAMES,
-                lyre_highlight_color=TextUtility.YELLOW
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum()
-            self.text_utility.wait_for_enter()
-            
-            self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                note_value_lines,
-                LyreHighlightMode.NOTE_VALUES,
-                lyre_highlight_color=TextUtility.YELLOW
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum(
-                highlight_color="\x1b[34m",
-                highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
+            for line in footnote_wrapped:
+                print((" " * footnote_left_padding) + line)
+
+        return self.pad_and_continue()
+
+class StoryScreen:
+    def __init__(
+        self,
+        lines: t.Union[t.List[str], str],
+        footnote: t.Optional[t.Union[t.List[str], str]] = None,
+        tut_utility: t.Optional[TutorialUtility] = None,
+        debug: t.Optional[bool] = False,
+        rng: t.Optional[random.Random] = None,
+    ):
+        self.lines = lines
+        self.footnote = footnote
+        self.debug = debug
+        self.rng = rng or random.Random()
+        
+        self.tut_utility = tut_utility or TutorialUtility(debug=self.debug, rng=self.rng)
+
+    def get_intro_step(
+            self,
+            func: t.Callable,
+            text_utility: t.Optional[TextUtility] = TextUtility(),
+            debug: t.Optional[bool] = False,
+            rng: t.Optional[random.Random] = None,
+        ) -> TutorialStep:
+        return TutorialStep(
+            level=None,
+            func=func,
+            text_utility=text_utility,
+            debug=debug,
+            rng=rng,
+        )
+
+    def get_func(self) -> t.Callable[[TutorialStep], str]:
+        def _res():
+            self.tut_utility.prose_screen(
+                lines=self.lines,
+                footnote_lines=self.footnote,
             )
-            self.text_utility.wait_for_enter()
+        return _res
 
-            self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                note_remaining_lines,
-                LyreHighlightMode.NOTE_COUNT,
-                lyre_highlight_color=TextUtility.YELLOW
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum()
-            self.text_utility.wait_for_enter()
+class TutorialStep:
 
-            self.text_utility.clear_screen()
-            req_line = self.get_requirement(level)
-            line_to_add =     TextUtility.blue("need") + ", shown after the line \"" + TextUtility.cyan(req_line.split(":")[0]) + "\"."
-            target_value_lines.insert(1, line_to_add)
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                target_value_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color=""
-            ))
-            print("=" * self.text_utility.get_term_width())
-            print(TextUtility.cyan(req_line.split(":")[0]) + ":" + TextUtility.blue(req_line.split(":")[1]))
-            self.print_mock_sum(
-                highlight_color="",
-                highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
+    def __init__(
+        self,
+        level: TextLevel,
+        func: t.Callable[[TutorialStep], str],
+        tut_utility: t.Optional[TutorialUtility] = None,
+        text_utility: t.Optional[TextUtility] = None,
+        debug: t.Optional[bool] = False,
+        rng: t.Optional[random.Random] = None,
+    ):
+        self.level = level
+        self.func = func
+        self.debug = debug
+        self.rng = rng or random.Random()
+        self.tut_utility = tut_utility or TutorialUtility(rng=self.rng, debug=self.debug)
+        self.text_utility = text_utility or TextUtility(rng=self.rng, debug=self.debug)
+
+    def play(self) -> str:
+        return self.func()
+
+# region Orpheus Tutorial Steps
+
+    def ot_step1(self) -> str:
+        self.text_utility.clear_screen()
+        lvl_text = self.text_utility.center_text(lines=LEVEL_LINES)
+        print(lvl_text)
+        return self.tut_utility.pad_and_continue(lvl_text.split("\n"))
+
+    def ot_step2(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.level.lyre,
+            LYRE_LINES,
+            LyreHighlightMode.HIGHLIGHT_ALL,
+            lyre_highlight_color=TextUtility.YELLOW
             )
-            self.text_utility.wait_for_enter()
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum()
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
 
-            self.text_utility.clear_screen()
-            level.print_header(omit_description=True)
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                finishing_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum(
-                highlight_color="",
-                highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
-            )
-            self.text_utility.wait_for_enter()
+    def ot_step3(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            NOTE_NAME_LINES,
+            LyreHighlightMode.NOTE_NAMES,
+            LyreHighlightMode.NOTE_NAMES,
+)
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum()
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
 
-            return level.run(tutorial_phase=TextLevel.TutorialPhase.ORPHEUS_ONLY)
-        except KeyboardInterrupt:
-            level.graceful_shutdown()
+    def ot_step4(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            NOTE_VALUE_LINES,
+            LyreHighlightMode.NOTE_VALUES,
+            LyreHighlightMode.NOTE_VALUES,
+            lyre_highlight_color=TextUtility.YELLOW
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="\x1b[34m",
+            highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
+        )
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
 
-    def play_eurydice_tutorial(self, level: TextLevel):
-        res = False
+    def ot_step5(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            NOTE_REMAINING_LINES,
+            LyreHighlightMode.NOTE_COUNT,
+            LyreHighlightMode.NOTE_COUNT,
+            lyre_highlight_color=TextUtility.YELLOW
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum()
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
 
-        try:
-            res = level.run(tutorial_phase=TextLevel.TutorialPhase.DEDUCTION_START)
-        except KeyboardInterrupt:
-            level.graceful_shutdown()
+    def ot_step6(self) -> str:
+        self.text_utility.clear_screen()
+        req_line = self.tut_utility.get_requirement(self.level)
+        line_to_add =     TextUtility.blue("need") + ", shown after the line \"" + TextUtility.cyan(req_line.split(":")[0]) + "\"."
+        TARGET_VALUE_LINES.insert(1, line_to_add)
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            TARGET_VALUE_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color=""
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = TextUtility.cyan(req_line.split(":")[0]) + ":" + TextUtility.blue(req_line.split(":")[1])
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="",
+            highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
+        )
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
 
-        if not res:
-            return
+    def ot_step7(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            FINISHING_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.level.get_requirement()
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="",
+            highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
+        )
+        return self.tut_utility.pad_and_contnue([hdr, lr, eq, req_lines, ms])
 
+# endregion
+
+# region deduction tutorial steps
+
+    def dt_step1(self) -> str:
         deduction_tutorial_lines = [
             "You aren't the only one who is moved by your music.",
             "It has a tremendous power to persuade those around you.",
-            f"Try and use it now to ask {TextUtility.cyan(level.challenge_name)}",
+            f"Try and use it now to ask {TextUtility.cyan(self.level.challenge_name)}",
             "to help you."
         ]
 
-        deduction_sum_lines = [
-            "You will play your lyre as before, but this time,",
-            "the " + TextUtility.blue("desired song") + " is a mystery."
-        ]
+        self.text_utility.clear_screen()
+        ded_text = self.text_utility.center_text(lines=deduction_tutorial_lines)
+        print(ded_text)
+        return self.text_utility.pad_and_continue(ded_text.split("\n"))
 
+    def dt_step2(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            DEDUCTION_SUM_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
+        print(req_line)
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="",
+            highlight_mode=SumHighlightMode.SUM,
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+
+    def dt_step3(self) -> str:
         deduction_addend_lines = [
             "However, you do know " + TextUtility.blue("how many notes"),
-            f"{TextUtility.cyan(level.challenge_name)} wants to hear. Make sure your song",
+            f"{TextUtility.cyan(self.level.challenge_name)} wants to hear. Make sure your song",
             "includes that many notes before you finish playing."
         ]
 
-        deduction_fail_lines = [
-            "you will have more than one chance to play.",
-            "Don't fail too many times, or else you will ",
-            TextUtility.red("run out of chances") + ".",
-        ]
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            deduction_addend_lines,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
+        print(req_line)
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color=TextUtility.BLUE,
+            highlight_mode=SumHighlightMode.ADDENDS,
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
 
-        deduction_deduce_lines = [
-            "It's important to pay attention to the songs",
-            "that " + TextUtility.red("fail") + " because that information can help you deduce",
-            "the song that will " + TextUtility.green("succeed") + "."
-        ]
+    def dt_step4(self) -> str:
+        self.text_utility.clear_screen()
+        req_line = self.tut_utility.get_requirement(self.level)
+        line_to_add = "Because you don't know the " + TextUtility.blue("song") + f" {TextUtility.cyan(req_line.split(":")[0])}, "
+        DEDUCTION_FAIL_LINES.insert(0, line_to_add)
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            DEDUCTION_FAIL_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
+        print(req_line)
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="",
+            highlight_mode=SumHighlightMode.SUM,
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
 
+    def dt_step5(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            DEDUCTION_DEDUCE_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_line = self.level.get_requirement()
+        ms = self.tut_utility.get_mock_sum(
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+
+    def dt_step6(self) -> str:
         thwart_lines = [
             "Sometimes, in the course of playing an incorrect song",
             "you will " + TextUtility.red("exhaust") + " a note needed "
@@ -441,151 +650,168 @@ class TutorialPlayer:
             "be notified when this happens.",
             "",
             "This information can also be used to deduce the ",
-            "song that " + TextUtility.cyan(level.challenge_name) + " wants to hear."
+            "song that " + TextUtility.cyan(self.level.challenge_name) + " wants to hear."
         ]
 
-        try_lines = [
-            "It may take some time to get a feel for this part",
-            "of your journey.",
-            "",
-            "Give it a try!"
-        ]
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            thwart_lines,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
+        print(req_line)
+        ms = self.tut_utility.get_mock_sum(
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+
+    def dt_step7(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header()
+        lr = self.get_lyre_with_lines(
+            self.level.self.level.lyre,
+            TRY_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_line = self.level.get_requirement()
+        ms = self.tut_utility.get_mock_sum(
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+
+# endregion
+
+class TutorialPlayer:
+    def __init__(self):
+        pass
+
+# region consts
+
+    INTRO_PAIRS: t.List[StoryScreen] = [
+        StoryScreen(INTRO_LINES_1),
+        StoryScreen(INTRO_LINES_2, FOOTNOTES_2),
+        StoryScreen(INTRO_LINES_3, FOOTNOTES_3),
+        StoryScreen(INTRO_LINES_4),
+        StoryScreen(INTRO_LINES_5),
+        StoryScreen(INTRO_LINES_6),
+        StoryScreen(INTRO_LINES_7),
+    ]
+
+    ORPHEUS_STEP_FUNCS: t.List[t.Callable] = [
+        TutorialStep.ot_step1,
+        TutorialStep.ot_step2,
+        TutorialStep.ot_step3,
+        TutorialStep.ot_step4,
+        TutorialStep.ot_step5,
+        TutorialStep.ot_step6,
+        TutorialStep.ot_step7,
+    ]
+
+    DEDUCTION_STEP_FUNCS: t.List[t.Callable] = [
+        TutorialStep.dt_step1,
+        TutorialStep.dt_step2,
+        TutorialStep.dt_step3,
+        TutorialStep.dt_step4,
+        TutorialStep.dt_step5,
+        TutorialStep.dt_step6,
+        TutorialStep.dt_step7,
+    ]
+
+# endregion
+
+    def get_intro_steps(self) -> t.Dict[int, TutorialStep]:
+        res: t.Dict[int, TutorialStep] = {}
+
+        for i, f in enumerate(TutorialPlayer.INTRO_PAIRS):
+            ts = f.get_intro_step(
+                func=f.get_func(),
+                text_utility=self.text_utility,
+                debug=self.debug,
+                rng=self.rng,
+            )
+            res[i] = ts
+        
+        return res
+
+    def get_orpheus_steps(
+        self,
+        level: TextLevel,
+    ) -> t.Dict[int, TutorialStep]:
+        res: t.Dict[int, TutorialStep] = {}
+
+        for i, f in enumerate(TutorialPlayer.ORPHEUS_STEP_FUNCS):
+            ts = TutorialStep(
+                level=level,
+                func=f,
+                text_utility=self.text_utility,
+                debug=self.debug,
+                rng=self.rng,
+            )
+            res[i] = ts
+
+        return res
+
+    def get_deduction_steps(
+        self,
+        level: TextLevel,
+    ) -> t.Dict[int, TutorialStep]:
+        res: t.Dict[int, TutorialStep] = {}
+
+        for i, f in enumerate(TutorialPlayer.DEDUCTION_STEP_FUNCS):
+            ts = TutorialStep(
+                level=level,
+                func=f,
+                text_utility=self.text_utility,
+                debug=self.debug,
+                rng=self.rng,
+            )
+            res[i] = ts
+
+        return res
+    
+    def play(
+        self,
+        level: TextLevel,
+        phase: TextLevel.TutorialPhase,
+    ) -> bool:
+        res = False
+        steps: t.Dict[int, TutorialStep] = {}
+
+        if phase == TextLevel.TutorialPhase.INTRO:
+            steps = self.get_intro_steps()
+        elif phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
+            steps = self.get_orpheus_steps()
+        elif phase == TextLevel.TutorialPhase.DEDUCTION_START:
+            steps = self.get_deduction_steps()
 
         try:
-            self.text_utility.clear_screen()
-            ded_text = self.text_utility.center_text(lines=deduction_tutorial_lines)
-            print(ded_text)
-            self.text_utility.pad_and_continue(ded_text.split("\n"))
+            i = 0
 
-            self.text_utility.clear_screen()
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                deduction_sum_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            req_lines = self.get_requirement(level).split(" ")
-            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
-            print(req_line)
-            self.print_mock_sum(
-                highlight_color="",
-                highlight_mode=SumHighlightMode.SUM,
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
+            while i < len(steps) - 1:
+                ip = steps[i].play()
 
-            self.text_utility.clear_screen()
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                deduction_addend_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            req_lines = self.get_requirement(level).split(" ")
-            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
-            print(req_line)
-            self.print_mock_sum(
-                highlight_color=TextUtility.BLUE,
-                highlight_mode=SumHighlightMode.ADDENDS,
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
+                if (ip.upper() == "Q"):
+                    level.graceful_shutdown()
+                elif (ip.upper() == "B") and (i > 0):
+                    i -= 1
+                else:
+                    i += 1
 
-            self.text_utility.clear_screen()
-            req_line = self.get_requirement(level)
-            line_to_add = "Because you don't know the " + TextUtility.blue("song") + f" {TextUtility.cyan(req_line.split(":")[0])}, "
-            deduction_fail_lines.insert(0, line_to_add)
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                deduction_fail_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            req_lines = self.get_requirement(level).split(" ")
-            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
-            print(req_line)
-            self.print_mock_sum(
-                highlight_color="",
-                highlight_mode=SumHighlightMode.SUM,
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
-
-            self.text_utility.clear_screen()
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                deduction_deduce_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum(
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
-
-            self.text_utility.clear_screen()
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                thwart_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            req_lines = self.get_requirement(level).split(" ")
-            req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
-            print(req_line)
-            self.print_mock_sum(
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
-
-            self.text_utility.clear_screen()
-            level.print_header()
-            print(self.get_lyre_with_lines(
-                level.level.lyre,
-                try_lines,
-                LyreHighlightMode.NO_HIGHLIGHT,
-                lyre_highlight_color="",
-            ))
-            print("=" * self.text_utility.get_term_width())
-            level.print_requirement()
-            self.print_mock_sum(
-                phase=TextLevel.Phase.DEDUCTION,
-                level=level,
-            )
-            self.text_utility.wait_for_enter()
-
-            return level.run(tutorial_phase=TextLevel.TutorialPhase.DEDUCTION_END)
+            if (phase != TextLevel.TutorialPhase.INTRO):
+                res = level.run(tutorial_phase=phase)
+            else:
+                res = True
         except KeyboardInterrupt:
             level.graceful_shutdown()
-
-    def play_tutorial(
-            self,
-            level: TextLevel,
-            tutorial_phase: TextLevel.TutorialPhase,
-        ) -> bool:
-        if tutorial_phase == TextLevel.TutorialPhase.NO_TUT:
-            return
-        elif tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
-            return self.play_orpheus_tutorial(level)
-        elif tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START:
-            return self.play_eurydice_tutorial(level)
-
-
-
-
+        
+        return res
+    

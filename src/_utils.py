@@ -14,6 +14,12 @@ from colorama import just_fix_windows_console
 
 APP_NAME = "GuidingEurydice"
 
+OPTION_SELECT_STR = "Please enter the number of the option you wish to select and press <Enter>."
+B_FOR_BACK_STR = "Enter B followed by <Enter> to go back to the previous menu."
+Q_TO_QUIT_STR = "Enter Q followed by <Enter> to quit."
+PROMPT_STR = ">"
+
+
 class UserDataManager:
     def __init__(self):
         pass
@@ -318,9 +324,10 @@ class TextUtility:
     
     def print_padded_lines(
         self,
-        lines: t.List[str]
+        lines: t.List[str],
+        n: t.Optional[int] = 0,
     ):
-      num_lines = self.get_all_but_last_line_padding(lines)
+      num_lines = self.get_all_but_last_n_lines_padding(lines, n=n)
       for _ in range(0, num_lines):
           print()
 
@@ -408,11 +415,12 @@ class TextUtility:
 
             return "\n".join(output_lines)
         
-    def get_all_but_last_line_padding(
+    def get_all_but_last_n_lines_padding(
         self,
         lines: t.List[str],
+        n: t.Optional[int] = 0,
     ) -> int:
-        return self.get_term_height() - len(lines) - 5
+        return self.get_term_height() - len(lines) - (5 + n)
     
     def boxify_lines(
         self,
@@ -595,15 +603,15 @@ class TextUtility:
         is_submenu: t.Optional[bool] = False
     ) -> str:
         default_prompt_lines = [
-            "Please enter the number of the option you wish to select and press <Enter>.",
-            "Enter Q followed by <Enter> to quit.",
-            "> "
+            OPTION_SELECT_STR,
+            Q_TO_QUIT_STR,
+            PROMPT_STR,
         ]
 
         if is_submenu:
             default_prompt_lines.insert(
                 1,
-                "Enter B followed by <Enter> to go back to the previous menu."
+                B_FOR_BACK_STR,
             )
 
         if additional_prompt:

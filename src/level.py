@@ -36,6 +36,7 @@ class TextLevel(Level):
         ORPHEUS_ONLY = 1
         DEDUCTION_START = 2
         DEDUCTION_END = 3
+        INTRO = 4
 
     REQUIREMENT_VERBS = [
         RequirementVerb("want"),
@@ -396,6 +397,38 @@ class TextLevel(Level):
         
         print(requirement_line)
         self.requirement_verb_idx += 1
+
+    def get_header(
+        self,
+        omit_description: t.Optional[bool] = False
+    ) -> str:
+        res = ""
+
+        title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
+        description = self.descriptions[self.description_idx % len(self.descriptions)]
+
+        if self.debug:
+            title_line += f" ({str(self.level.get_state())})"
+
+        term_width = self.text_utility.get_term_width()
+        res += ("=" * term_width)
+        res += (
+            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
+            title_line,
+            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
+        )
+        res += ("=" * term_width)
+
+        if not omit_description:
+            res += (
+                " " * self.text_utility.get_horizontal_padding(term_width, description),
+                description,
+                " " * self.text_utility.get_horizontal_padding(term_width, description),
+            )
+            res += ("-" * term_width)
+            self.description_idx += 1
+
+        return res
 
     def print_header(
             self,

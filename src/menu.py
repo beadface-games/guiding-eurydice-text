@@ -12,7 +12,7 @@ import typing as t
 from src.level import TextLevel
 from src.profile import DEFAULT_LEVEL_DATA_DIR, DEFAULT_PROFILE_DATA_DIR, Profile
 from src.tutorial import TutorialPlayer
-from src._utils import UserDataManager, TextUtility
+from src._utils import B_FOR_BACK_STR, UserDataManager, TextUtility
 
 type MenuAction = t.Callable[[t.Any], t.Union[LevelMenu, None]]
 
@@ -313,7 +313,7 @@ class ProfileMenu(Menu):
         
         try:
             self.text_utility.clear_screen()
-            name = self.text_utility.menu_screen(lines=["Create a New Profile"], prompt="Please enter a name for your new profile.\nPress B followed by <Enter> to cancel.\n> ")
+            name = self.text_utility.menu_screen(lines=["Create a New Profile"], prompt="Please enter a name for your new profile.\n" + B_FOR_BACK_STR + ".\n> ")
             valid, err_str = self.validate_profile_name(name)
 
             while not valid:
@@ -421,7 +421,7 @@ class LevelMenu(Menu):
             else:
                 tutorial_phase = TextLevel.TutorialPhase.DEDUCTION_START
         
-            res = self.tutorial_player.play_tutorial(level, tutorial_phase)
+            res = self.tutorial_player.play(level, tutorial_phase)
         else:
             res = level.run()
 
@@ -445,8 +445,9 @@ class LevelMenu(Menu):
             self.text_utility.clear_screen()
 
             if play_intro:
-                self.tutorial_player.play_intro()
-                self.profile.has_viewed_intro = True
+                res = self.tutorial_player.play(level=None, phase=TextLevel.TutorialPhase.INTRO)
+                if res:
+                    self.profile.has_viewed_intro = True
                 self.profile.save()
 
             choice = self.text_utility.menu_screen(lines=self.get_level_strs(), is_submenu=True, additional_prompt=f"Welcome, {TextUtility.blue(self.profile.name)}.")
