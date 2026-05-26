@@ -282,7 +282,6 @@ class ProfileMenu(Menu):
             profile_list.sort(key=lambda p: p.timestamp)     
 
             if len(profile_list) == 1:
-                print("trying")
                 self.last_profile = profile_list[0]
                 self.last_profile.save()
                 self.render(prompt=f"Loaded your only other profile, {self.last_profile.name}.\n> ")

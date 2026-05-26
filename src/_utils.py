@@ -34,6 +34,7 @@ class UserDataManager:
         return app_dir
 
     def resource_path(self, relative_path: str) -> pathlib.Path:
+
         if getattr(sys, "frozen", False):
             return pathlib.Path(sys._MEIPASS) / relative_path
 

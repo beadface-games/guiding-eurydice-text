@@ -314,7 +314,7 @@ class Profile():
         
         for file in level_files:
             if file.startswith("level") and file.endswith(".json"):
-                file_path = self.level_data_dir.joinpath(file)
+                file_path = self.user_data_manager.resource_path(self.level_data_dir.joinpath(file))
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     title = None
