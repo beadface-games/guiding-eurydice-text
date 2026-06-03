@@ -78,7 +78,6 @@ class LevelInfo():
         id: int,
         title: str,
         level_path: t.Optional[pathlib.Path] = None,
-        tutorial_complete: t.Optional[bool] = False,
         stats: t.Optional[LevelInfo.Stats] = None,
         locked: t.Optional[bool] = True,
         debug: t.Optional[bool] = False,
@@ -95,7 +94,6 @@ class LevelInfo():
         if not os.path.exists(self.user_data_manager.resource_path(self.level_path)):
             raise LevelInfo.LevelMissingException(f"Unable to find level at {self.level_path}")
         
-        self.tutorial_complete = tutorial_complete
         self.locked = locked
 
         self.stats = stats or Stats()
@@ -107,7 +105,6 @@ class LevelInfo():
         res += "id: " + str(self.id) + "\n"
         res += "title: " + self.title + "\n"
         res += "level_path:" + str(self.level_path) + "\n"
-        res += "tutorial_complete: " + str(self.tutorial_complete) + "\n"
         res += "stats: " + str(self.stats) + "\n"
         res += "locked: " + str(self.locked) + "\n"
         return res
@@ -119,7 +116,6 @@ class LevelInfo():
         lid = {}
         lid["title"] = self.title
         lid["level_path"] = str(self.level_path)
-        lid["tutorial_complete"] = self.tutorial_complete
         lid["locked"] = self.locked
         lid["stats"] = self.stats.to_dict()
 
@@ -133,7 +129,6 @@ class LevelInfo():
     ) -> LevelInfo:
         title = None
         level_path = None
-        tutorial_complete = False
         locked = True
         stats = None
         
@@ -142,9 +137,6 @@ class LevelInfo():
 
         if ("level_path" in level_data.keys()) and (isinstance(level_data["level_path"], str)):
             level_path = level_data["level_path"]
-
-        if ("tutorial_complete" in level_data.keys()) and (isinstance(level_data["tutorial_complete"], bool)):
-            tutorial_complete = level_data["tutorial_complete"]
         
         if ("locked" in level_data.keys()) and (isinstance(level_data["locked"], bool)):
             locked = level_data["locked"]
@@ -156,7 +148,6 @@ class LevelInfo():
             id=id,
             title=title,
             level_path=level_path,
-            tutorial_complete=tutorial_complete,
             locked=locked,
             stats=stats,
             debug=debug
@@ -181,6 +172,7 @@ class Profile():
         profile_data_dir: t.Optional[pathlib.Path] = None,
         level_data_dir: t.Optional[pathlib.Path] = None,
         has_viewed_intro: t.Optional[bool] = False,
+        has_viewed_tut: t.Optional[bool] = False,
         debug: t.Optional[bool] = False,
         user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
     ):
@@ -191,6 +183,7 @@ class Profile():
         self.profile_data_dir = profile_data_dir or DEFAULT_PROFILE_DATA_DIR
         self.level_data_dir = level_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
         self.has_viewed_intro = has_viewed_intro
+        self.has_viewed_tut = has_viewed_tut
         self.debug = debug
         self.user_data_manager = user_data_manager
 
@@ -214,6 +207,7 @@ class Profile():
         profile_data_dir = None
         level_data_dir = None
         has_viewed_intro = None
+        has_viewed_tut = None
 
         if ("id" in profile_data.keys()) and (isinstance(profile_data["id"], int)):
             id = profile_data["id"]
@@ -248,6 +242,9 @@ class Profile():
         
         if ("has_viewed_intro" in profile_data.keys()) and (isinstance(profile_data["has_viewed_intro"], bool)):
             has_viewed_intro = profile_data["has_viewed_intro"]
+
+        if ("has_viewed_tut" in profile_data.keys()) and (isinstance(profile_data["has_viewed_tut"], bool)):
+            has_viewed_tut = profile_data["has_viewed_tut"]
         
         return Profile(
             id=id,
@@ -257,6 +254,7 @@ class Profile():
             profile_data_dir=profile_data_dir,
             level_data_dir=level_data_dir,
             has_viewed_intro=has_viewed_intro,
+            has_viewed_tut=has_viewed_tut,
             debug=debug
         )
     
@@ -278,6 +276,7 @@ class Profile():
         res["profile_data_dir"] = str(self.profile_data_dir)
         res["level_data_dir"] = str(self.level_data_dir)
         res["has_viewed_intro"] = self.has_viewed_intro
+        res["has_viewed_tut"] = self.has_viewed_tut
 
         return res
     
@@ -337,7 +336,6 @@ class Profile():
                         id=id,
                         title=title,
                         level_path=file_path,
-                        tutorial_complete=tutorial_complete,
                         stats=Stats(),
                         locked=True,
                         debug=self.debug,

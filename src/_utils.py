@@ -15,8 +15,11 @@ from colorama import just_fix_windows_console
 APP_NAME = "GuidingEurydice"
 
 OPTION_SELECT_STR = "Please enter the number of the option you wish to select and press <Enter>."
-B_FOR_BACK_STR = "Enter B followed by <Enter> to go back to the previous menu."
+B_FOR_BACK_STR_MENU = "Enter B followed by <Enter> to go back to the previous menu."
+B_FOR_BACK_STR_SCREEN = "Enter B followed by <Enter> to return to the previous screen."
 Q_TO_QUIT_STR = "Enter Q followed by <Enter> to quit."
+Q_TO_MENU_STR = "Enter Q followed by <Enter> to return to the level menu."
+S_TO_SKIP_STR = "Enter S followed by <Enter> to skip."
 PROMPT_STR = ">"
 
 
@@ -62,6 +65,7 @@ class UserDataManager:
 udm = UserDataManager()
 CONTINUE_PROMPT = "Press <Enter> to continue."
 DEFAULT_LEVEL_DATA_DIR = "guiding_eurydice_levels/levels"
+DEFAULT_TUT_DATA_DIR = "guiding_eurydice_levels/levels"
 
 DATE_FORMAT_STR = "%Y-%m-%d %I:%M:%S %p"
 DEFAULT_PROFILE_DATA_DIR = udm.get_profiles_dir()
@@ -327,7 +331,7 @@ class TextUtility:
         lines: t.List[str],
         n: t.Optional[int] = 0,
     ):
-      num_lines = self.get_all_but_last_n_lines_padding(lines, n=n)
+      num_lines = self.get_all_but_last_n_lines_padding(lines, prompt_height=n)
       for _ in range(0, num_lines):
           print()
 
@@ -386,6 +390,7 @@ class TextUtility:
             output_lines.extend("" for _ in range(top_padding))
 
             return "\n".join(output_lines)
+        
         elif multi_lines is not None:
             rendered_line_groups = []
             total_height = 0
@@ -414,13 +419,18 @@ class TextUtility:
                     output_lines.extend("" for _ in range(in_between_padding))
 
             return "\n".join(output_lines)
-        
-    def get_all_but_last_n_lines_padding(
-        self,
-        lines: t.List[str],
-        n: t.Optional[int] = 0,
-    ) -> int:
-        return self.get_term_height() - len(lines) - (5 + n)
+
+    def visual_line_count(self, lines: list[str], width: int) -> int:
+        total = 0
+        for line in lines:
+            wrapped = textwrap.wrap(line, width=width) or [""]
+            total += len(wrapped)
+        return total
+
+    def get_all_but_last_n_lines_padding(self, lines: t.List[str], prompt_height: int) -> int:
+        width = shutil.get_terminal_size().columns
+        content_height = self.visual_line_count(lines, width)
+        return max(0, self.get_term_height() - content_height - prompt_height)
     
     def boxify_lines(
         self,
@@ -611,7 +621,7 @@ class TextUtility:
         if is_submenu:
             default_prompt_lines.insert(
                 1,
-                B_FOR_BACK_STR,
+                B_FOR_BACK_STR_MENU,
             )
 
         if additional_prompt:

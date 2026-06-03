@@ -132,6 +132,15 @@ class TextLevel(Level):
             print(f"level id: {self.level.id}")
             print(f"level: {str(self.level)}")
 
+    def __eq__(self, other) -> bool:
+        return self.id == other.id
+
+    def __lt__(self, other) -> bool:
+        return self.id < other.id
+
+    def __gt__(self, other) -> bool:
+        return self.id > other.id
+
     @staticmethod
     def from_json(
         json_path: pathlib.Path,
@@ -412,19 +421,15 @@ class TextLevel(Level):
 
         term_width = self.text_utility.get_term_width()
         res += ("=" * term_width)
-        res += (
-            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
-            title_line,
-            " " * self.text_utility.get_horizontal_padding(term_width, title_line),
-        )
+        res += " " * self.text_utility.get_horizontal_padding(term_width, title_line)
+        res += title_line
+        res += " " * self.text_utility.get_horizontal_padding(term_width, title_line)
         res += ("=" * term_width)
 
         if not omit_description:
-            res += (
-                " " * self.text_utility.get_horizontal_padding(term_width, description),
-                description,
-                " " * self.text_utility.get_horizontal_padding(term_width, description),
-            )
+            res += " " * self.text_utility.get_horizontal_padding(term_width, description)
+            res += description
+            res += " " * self.text_utility.get_horizontal_padding(term_width, description)
             res += ("-" * term_width)
             self.description_idx += 1
 

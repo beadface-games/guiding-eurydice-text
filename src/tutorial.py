@@ -1,3 +1,5 @@
+import os
+import pathlib
 import random
 import typing as t
 
@@ -6,7 +8,8 @@ from enum import Enum
 from guiding_eurydice_core.src.lyre import Lyre, Note
 
 from src.level import TextLevel
-from src._utils import CONTINUE_PROMPT, B_FOR_BACK_STR, Q_TO_QUIT_STR, PROMPT_STR, TextUtility
+from src.profile import Profile
+from src._utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility
 
 # region intro lines
 
@@ -58,7 +61,7 @@ INTRO_LINES_5 = [
     "was bitten on the ankle by a snake.",
 ]
 
-INTRO_LINES_6 = TextUtility.red("She collapsed and died.")
+INTRO_LINES_6 = [TextUtility.red("She collapsed and died.")]
 
 INTRO_LINES_7 = [
     TextUtility.blue("The Thracian poet") + ",",
@@ -301,21 +304,25 @@ class TutorialUtility:
         self,
         lines: t.List[str],
         back_enabled: t.Optional[bool] = False,
+        skip_enabled: t.Optional[bool] = True,
     ) -> str:
         prompt_strs = [
             CONTINUE_PROMPT,
-            Q_TO_QUIT_STR,
+            Q_TO_MENU_STR,
             PROMPT_STR,
         ]
 
-        if back_enabled:
-            prompt_strs.insert(
-                1,
-                B_FOR_BACK_STR
-            )
+        if skip_enabled:
+            prompt_strs.insert(1, S_TO_SKIP_STR)
 
-        self.text_utility.print_padded_lines(lines, len(prompt_strs) - 1)
+        if back_enabled:
+            prompt_strs.insert(1, B_FOR_BACK_STR_SCREEN)
+        
+
+        print("\n".join(lines))
+
         return input("\n".join(prompt_strs))
+            
     
     def prose_screen(
         self,
@@ -323,12 +330,15 @@ class TutorialUtility:
         footnote_lines: t.Optional[t.List[str]] = None,
         center_footnotes: t.Optional[bool] = False,
         max_width: int = 64,
+        back_enabled: t.Optional[bool] = False,
+        skip_enabled: t.Optional[bool] = False,
     ):
+        res_lines = []
         if not self.debug:
-            self.clear_screen()
+            self.text_utility.clear_screen()
 
-        term_width = self.get_term_width()
-        term_height = self.get_term_height()
+        term_width = self.text_utility.get_term_width()
+        term_height = self.text_utility.get_term_height()
 
         wrapped = self.text_utility.wrap_lines(lines, max_width)
         footnote_wrapped = self.text_utility.wrap_lines(footnote_lines or [], max_width)
@@ -337,10 +347,10 @@ class TutorialUtility:
         left_padding = max((term_width - block_width) // 2, 0)
 
         top_padding = max((term_height - len(wrapped)) // 2 - 2, 0)
-        print("\n" * top_padding, end="")
+        res_lines.extend([""] * top_padding)
 
         for line in wrapped:
-            print((" " * left_padding) + line)
+            res_lines.append((" " * left_padding) + line)
 
         # Footnote area, near bottom.
         prompt_reserved_lines = 2
@@ -353,29 +363,33 @@ class TutorialUtility:
             1,
         ) - 1
 
-        print("\n" * footnote_gap, end="")
+        res_lines.extend([""] * footnote_gap)
 
         if footnote_wrapped:
-            print("-" * term_width)
+            res_lines.append("-" * term_width)
             footnote_width = max((self.text_utility.visible_len(line) for line in footnote_wrapped), default=0)
             footnote_left_padding = max((term_width - footnote_width) // 2, 0) if center_footnotes else 0
 
             for line in footnote_wrapped:
-                print((" " * footnote_left_padding) + line)
+                res_lines.append((" " * footnote_left_padding) + line)
 
-        return self.pad_and_continue()
+        return self.pad_and_continue(lines=res_lines, back_enabled=back_enabled, skip_enabled=skip_enabled)
 
 class StoryScreen:
     def __init__(
         self,
         lines: t.Union[t.List[str], str],
         footnote: t.Optional[t.Union[t.List[str], str]] = None,
+        back_enabled: t.Optional[bool] = False,
+        skip_enabled: t.Optional[bool] = False,
         tut_utility: t.Optional[TutorialUtility] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
     ):
         self.lines = lines
         self.footnote = footnote
+        self.back_enabled = back_enabled
+        self.skip_enabled = skip_enabled
         self.debug = debug
         self.rng = rng or random.Random()
         
@@ -396,11 +410,13 @@ class StoryScreen:
             rng=rng,
         )
 
-    def get_func(self) -> t.Callable[[TutorialStep], str]:
-        def _res():
-            self.tut_utility.prose_screen(
+    def get_func(self) -> t.Callable[[None], str]:
+        def _res() -> str:
+            return self.tut_utility.prose_screen(
                 lines=self.lines,
                 footnote_lines=self.footnote,
+                back_enabled=self.back_enabled,
+                skip_enabled=self.skip_enabled,
             )
         return _res
 
@@ -409,7 +425,7 @@ class TutorialStep:
     def __init__(
         self,
         level: TextLevel,
-        func: t.Callable[[TutorialStep], str],
+        func: t.Optional[t.Callable[[None], str]] = None,
         tut_utility: t.Optional[TutorialUtility] = None,
         text_utility: t.Optional[TextUtility] = None,
         debug: t.Optional[bool] = False,
@@ -422,8 +438,25 @@ class TutorialStep:
         self.tut_utility = tut_utility or TutorialUtility(rng=self.rng, debug=self.debug)
         self.text_utility = text_utility or TextUtility(rng=self.rng, debug=self.debug)
 
+    def get_func(
+        self,
+        method: t.Callable[["TutorialStep"], str]
+    ) -> t.Callable[[], str]:
+
+        def _res() -> str:
+            return method(self)
+
+        return _res
+
     def play(self) -> str:
-        return self.func()
+        try:
+            return self.func()
+        except Exception as e:
+            print("TutorialStep crashed")
+            print("func:", self.func)
+            print("type:", type(e).__name__)
+            print("error:", e)
+            raise
 
 # region Orpheus Tutorial Steps
 
@@ -431,12 +464,12 @@ class TutorialStep:
         self.text_utility.clear_screen()
         lvl_text = self.text_utility.center_text(lines=LEVEL_LINES)
         print(lvl_text)
-        return self.tut_utility.pad_and_continue(lvl_text.split("\n"))
+        return self.tut_utility.pad_and_continue(lvl_text.split("\n"), back_enabled=False, skip_enabled=True)
 
     def ot_step2(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
+        lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             LYRE_LINES,
             LyreHighlightMode.HIGHLIGHT_ALL,
@@ -445,29 +478,27 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum()
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step3(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             NOTE_NAME_LINES,
             LyreHighlightMode.NOTE_NAMES,
-            LyreHighlightMode.NOTE_NAMES,
-)
+        )
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum()
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step4(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             NOTE_VALUE_LINES,
-            LyreHighlightMode.NOTE_VALUES,
             LyreHighlightMode.NOTE_VALUES,
             lyre_highlight_color=TextUtility.YELLOW
         )
@@ -477,33 +508,32 @@ class TutorialStep:
             highlight_color="\x1b[34m",
             highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
         )
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step5(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             NOTE_REMAINING_LINES,
-            LyreHighlightMode.NOTE_COUNT,
             LyreHighlightMode.NOTE_COUNT,
             lyre_highlight_color=TextUtility.YELLOW
         )
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum()
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step6(self) -> str:
         self.text_utility.clear_screen()
         req_line = self.tut_utility.get_requirement(self.level)
-        line_to_add =     TextUtility.blue("need") + ", shown after the line \"" + TextUtility.cyan(req_line.split(":")[0]) + "\"."
-        TARGET_VALUE_LINES.insert(1, line_to_add)
+        line_to_add = TextUtility.blue("need") + ", shown after the line \"" + TextUtility.cyan(req_line.split(":")[0]) + "\"."
+        if len(TARGET_VALUE_LINES) == 4:
+            TARGET_VALUE_LINES.insert(1, line_to_add)
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             TARGET_VALUE_LINES,
-            LyreHighlightMode.NO_HIGHLIGHT,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color=""
         )
@@ -513,25 +543,24 @@ class TutorialStep:
             highlight_color="",
             highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
         )
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step7(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             FINISHING_LINES,
-            LyreHighlightMode.NO_HIGHLIGHT,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
         )
         eq = ("=" * self.text_utility.get_term_width())
-        req_lines = self.level.get_requirement()
+        req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum(
             highlight_color="",
             highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
         )
-        return self.tut_utility.pad_and_contnue([hdr, lr, eq, req_lines, ms])
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
 # endregion
 
@@ -548,13 +577,13 @@ class TutorialStep:
         self.text_utility.clear_screen()
         ded_text = self.text_utility.center_text(lines=deduction_tutorial_lines)
         print(ded_text)
-        return self.text_utility.pad_and_continue(ded_text.split("\n"))
+        return self.tut_utility.pad_and_continue(ded_text.split("\n"), back_enabled=False, skip_enabled=True)
 
     def dt_step2(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             DEDUCTION_SUM_LINES,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
@@ -562,14 +591,13 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level).split(" ")
         req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
-        print(req_line)
         ms = self.tut_utility.get_mock_sum(
             highlight_color="",
             highlight_mode=SumHighlightMode.SUM,
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
     def dt_step3(self) -> str:
         deduction_addend_lines = [
@@ -580,8 +608,8 @@ class TutorialStep:
 
         self.text_utility.clear_screen()
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             deduction_addend_lines,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
@@ -589,23 +617,23 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level).split(" ")
         req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
-        print(req_line)
         ms = self.tut_utility.get_mock_sum(
             highlight_color=TextUtility.BLUE,
             highlight_mode=SumHighlightMode.ADDENDS,
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled = True, skip_enabled=True)
 
     def dt_step4(self) -> str:
         self.text_utility.clear_screen()
         req_line = self.tut_utility.get_requirement(self.level)
         line_to_add = "Because you don't know the " + TextUtility.blue("song") + f" {TextUtility.cyan(req_line.split(":")[0])}, "
-        DEDUCTION_FAIL_LINES.insert(0, line_to_add)
+        if len(DEDUCTION_FAIL_LINES) == 3:
+            DEDUCTION_FAIL_LINES.insert(0, line_to_add)
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             DEDUCTION_FAIL_LINES,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
@@ -613,31 +641,30 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level).split(" ")
         req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
-        print(req_line)
         ms = self.tut_utility.get_mock_sum(
             highlight_color="",
             highlight_mode=SumHighlightMode.SUM,
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
     def dt_step5(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             DEDUCTION_DEDUCE_LINES,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
         )
         eq = ("=" * self.text_utility.get_term_width())
-        req_line = self.level.get_requirement()
+        req_line = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum(
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
     def dt_step6(self) -> str:
         thwart_lines = [
@@ -655,8 +682,8 @@ class TutorialStep:
 
         self.text_utility.clear_screen()
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             thwart_lines,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
@@ -664,46 +691,56 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level).split(" ")
         req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines)])
-        print(req_line)
         ms = self.tut_utility.get_mock_sum(
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
     def dt_step7(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header()
-        lr = self.get_lyre_with_lines(
-            self.level.self.level.lyre,
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
             TRY_LINES,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color="",
         )
         eq = ("=" * self.text_utility.get_term_width())
-        req_line = self.level.get_requirement()
+        req_line = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum(
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        return self.tut_utility.pad_and_continue("\n".join([hdr, lr, eq, req_line, ms]))
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
 # endregion
 
 class TutorialPlayer:
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        profile: Profile,
+        text_utility: t.Optional[TextUtility] = TextUtility(),
+        debug: t.Optional[bool] = False,
+        rng: t.Optional[random.Random] = None,
+        tut_data_dir: t.Optional[pathlib.Path] = None
+    ):
+        self.profile = profile
+        self.text_utility = text_utility
+        self.tut_data_dir = tut_data_dir or pathlib.Path(DEFAULT_TUT_DATA_DIR)
+        self.debug = debug
+        self.rng = rng or random.Random()
 
 # region consts
 
     INTRO_PAIRS: t.List[StoryScreen] = [
-        StoryScreen(INTRO_LINES_1),
-        StoryScreen(INTRO_LINES_2, FOOTNOTES_2),
-        StoryScreen(INTRO_LINES_3, FOOTNOTES_3),
-        StoryScreen(INTRO_LINES_4),
-        StoryScreen(INTRO_LINES_5),
-        StoryScreen(INTRO_LINES_6),
-        StoryScreen(INTRO_LINES_7),
+        StoryScreen(INTRO_LINES_1, back_enabled=False, skip_enabled=True),
+        StoryScreen(INTRO_LINES_2, FOOTNOTES_2, back_enabled=True, skip_enabled=True),
+        StoryScreen(INTRO_LINES_3, FOOTNOTES_3, back_enabled=True, skip_enabled=True),
+        StoryScreen(INTRO_LINES_4, back_enabled=True, skip_enabled=True),
+        StoryScreen(INTRO_LINES_5, back_enabled=True, skip_enabled=True),
+        StoryScreen(INTRO_LINES_6, back_enabled=True, skip_enabled=True),
+        StoryScreen(INTRO_LINES_7, back_enabled=True, skip_enabled=True),
     ]
 
     ORPHEUS_STEP_FUNCS: t.List[t.Callable] = [
@@ -727,14 +764,36 @@ class TutorialPlayer:
     ]
 
 # endregion
+    def load_tut_levels(self) -> t.List[TextLevel]:
+        if not os.path.exists(self.tut_data_dir):
+            raise FileNotFoundError(f"Unable to find tutorial directory {self.tut_data_dir}")
+
+        files = []
+        for _, _, filenames in os.walk(self.profile.level_data_dir):
+            files.extend(filenames)
+
+        tuts = [file for file in files if file.startswith("tut")]
+
+        if len(tuts) == 0:
+            raise FileNotFoundError(f"No tutorial levels found in tutorial directory {self.tut_data_dir}")
+
+        if len(tuts) != 2:
+            raise FileNotFoundError(f"Found wrong number of tutorial level definitions in {self.tut_data_dir}: {len(files)} (expected 2)")
+        
+        levels = []
+        for f in tuts:
+            tl = TextLevel.from_json(self.tut_data_dir.joinpath(f))
+            levels.append(tl)
+        
+        return sorted(levels)
 
     def get_intro_steps(self) -> t.Dict[int, TutorialStep]:
         res: t.Dict[int, TutorialStep] = {}
 
         for i, f in enumerate(TutorialPlayer.INTRO_PAIRS):
             ts = f.get_intro_step(
-                func=f.get_func(),
                 text_utility=self.text_utility,
+                func=f.get_func(),
                 debug=self.debug,
                 rng=self.rng,
             )
@@ -751,11 +810,11 @@ class TutorialPlayer:
         for i, f in enumerate(TutorialPlayer.ORPHEUS_STEP_FUNCS):
             ts = TutorialStep(
                 level=level,
-                func=f,
                 text_utility=self.text_utility,
                 debug=self.debug,
                 rng=self.rng,
             )
+            ts.func = ts.get_func(f)
             res[i] = ts
 
         return res
@@ -769,49 +828,74 @@ class TutorialPlayer:
         for i, f in enumerate(TutorialPlayer.DEDUCTION_STEP_FUNCS):
             ts = TutorialStep(
                 level=level,
-                func=f,
                 text_utility=self.text_utility,
                 debug=self.debug,
                 rng=self.rng,
             )
+            ts.func = ts.get_func(f)
             res[i] = ts
 
         return res
     
     def play(
         self,
-        level: TextLevel,
         phase: TextLevel.TutorialPhase,
+        level: t.Optional[TextLevel] = TextLevel(),
     ) -> bool:
+        def _run_tut_steps() -> bool:
+            i = 0
+
+            try:
+                while (i < len(steps)) and (i > -1):
+                    ip = steps[i].play()
+                    if (ip is None) or (len(ip) == 0):
+                        i += 1
+                        continue
+
+                    if (ip.upper() == "Q"):
+                        return False    
+                    elif (ip.upper() == "S"):
+                        break         
+                    elif (ip.upper() == "B"):
+                        i -= 1
+
+                return True
+            except KeyboardInterrupt:
+                print("Goodbye")
+                SystemExit(0)       
+
         res = False
         steps: t.Dict[int, TutorialStep] = {}
 
-        if phase == TextLevel.TutorialPhase.INTRO:
-            steps = self.get_intro_steps()
-        elif phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
-            steps = self.get_orpheus_steps()
-        elif phase == TextLevel.TutorialPhase.DEDUCTION_START:
-            steps = self.get_deduction_steps()
-
         try:
-            i = 0
+            if phase == TextLevel.TutorialPhase.INTRO:
+                steps = self.get_intro_steps()
+                res = _run_tut_steps()
 
-            while i < len(steps) - 1:
-                ip = steps[i].play()
+            elif (phase == TextLevel.TutorialPhase.ORPHEUS_ONLY):
+                steps = self.get_orpheus_steps(level)
+                res = _run_tut_steps()
 
-                if (ip.upper() == "Q"):
-                    level.graceful_shutdown()
-                elif (ip.upper() == "B") and (i > 0):
-                    i -= 1
-                else:
-                    i += 1
+                if res:
+                    res = level.run(tutorial_phase=phase)
 
-            if (phase != TextLevel.TutorialPhase.INTRO):
+            elif (phase == TextLevel.TutorialPhase.DEDUCTION_START):
+                steps = self.get_deduction_steps(level)
                 res = level.run(tutorial_phase=phase)
+            
+                if res:
+                    cont = _run_tut_steps()
+
+                    if cont:
+                        res = res.run(tutorial_phase=TextLevel.TutorialPhase.DEDUCTION_END)
+                    else:
+                        res = False
+            
             else:
-                res = True
+                raise ValueError(f"Unexpected phase", phase)
         except KeyboardInterrupt:
-            level.graceful_shutdown()
+            print("Goodbye.")
+            SystemExit(0)
         
         return res
     
