@@ -12,9 +12,9 @@ import typing as t
 from src.level import TextLevel
 from src.profile import DEFAULT_LEVEL_DATA_DIR, DEFAULT_PROFILE_DATA_DIR, Profile
 from src.tutorial import TutorialPlayer
-from src._utils import B_FOR_BACK_STR, UserDataManager, TextUtility
+from src._utils import B_FOR_BACK_STR_MENU, DEFAULT_TUT_DATA_DIR, UserDataManager, TextUtility
 
-type MenuAction = t.Callable[[t.Any], t.Union[LevelMenu, None]]
+type MenuAction = t.Callable[[t.Any], Menu]
 
 class Option:
     def __init__(
@@ -53,6 +53,7 @@ class ProfileMenu(Menu):
         self,
         save_data_dir: t.Optional[pathlib.Path] = None,
         profile_data_dir: t.Optional[pathlib.Path] = None,
+        tut_data_dir: t.Optional[pathlib.Path] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
         user_data_manager: t.Optional[UserDataManager] = UserDataManager()
@@ -63,13 +64,19 @@ class ProfileMenu(Menu):
         self.user_data_manager = user_data_manager
         self.level_data_dir = save_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
         self.profile_data_dir = profile_data_dir or pathlib.Path(DEFAULT_PROFILE_DATA_DIR)
-
+        self.tut_data_dir = tut_data_dir or pathlib.Path(DEFAULT_TUT_DATA_DIR)
 
         self.profiles = {}
         self.load_profiles()
         self.last_profile = self.get_last_profile()
         self.options = {}
         self.reload_options()  
+
+        self.tutorial_player = TutorialPlayer(
+            profile=self.last_profile,
+            debug=self.debug,
+            rng=self.rng,
+            tut_data_dir=self.tut_data_dir)
 
     def sort_options(
         self,
@@ -122,6 +129,18 @@ class ProfileMenu(Menu):
                 f"Continue as {self.last_profile.name}",
                 self.load_last_profile
             ), 1)
+
+            if self.last_profile.has_viewed_intro:
+                self.insert_option(Option(
+                    "Play Intro",
+                    self.play_intro
+                ), len(self.options.keys()) + 1)
+
+            if self.last_profile.has_viewed_tut:
+                self.insert_option(Option(
+                    "Play Tutorial",
+                    self.play_tutorial,
+                ), len(self.options.keys()) + 1)
             
     
     def load_profiles(self) -> t.Dict[int, Profile]:
@@ -234,7 +253,7 @@ class ProfileMenu(Menu):
     def render(
         self,
         prompt: t.Optional[str] = None,
-    ) -> t.Union[LevelMenu, None]:
+    ) -> Menu:
         try:
             self.reload_options()
             self.text_utility.clear_screen()
@@ -274,7 +293,10 @@ class ProfileMenu(Menu):
             self.last_profile,
             debug=self.debug,
             rng=self.rng
-        ).render(not self.last_profile.has_viewed_intro)
+        ).render(
+            not self.last_profile.has_viewed_intro,
+            not self.last_profile.has_viewed_tut,
+        )
 
     def load_other_profile(self) -> LevelMenu:
         try:
@@ -313,7 +335,7 @@ class ProfileMenu(Menu):
         
         try:
             self.text_utility.clear_screen()
-            name = self.text_utility.menu_screen(lines=["Create a New Profile"], prompt="Please enter a name for your new profile.\n" + B_FOR_BACK_STR + ".\n> ")
+            name = self.text_utility.menu_screen(lines=["Create a New Profile"], prompt="Please enter a name for your new profile.\n" + B_FOR_BACK_STR_MENU + ".\n> ")
             valid, err_str = self.validate_profile_name(name)
 
             while not valid:
@@ -330,7 +352,40 @@ class ProfileMenu(Menu):
             self.last_profile = profile
             self.load_last_profile()
         except KeyboardInterrupt:
-            self.quit()               
+            self.quit()   
+
+    def play_intro(self) -> ProfileMenu:
+        try:
+            res = self.tutorial_player.play(level=None, phase=TextLevel.TutorialPhase.INTRO)
+            if res:
+                self.last_profile.has_viewed_intro = True
+            self.last_profile.save()  
+            return self.render()     
+        except KeyboardInterrupt:
+            self.quit()
+
+    def play_tutorial(self) -> LevelMenu:
+        levels = self.tutorial_player.load_tut_levels()
+
+        i = 0
+        res = True
+        
+        try:
+            while res and (i < len(levels)):
+                if levels[i].orpheus_only:
+                    tutorial_phase = TextLevel.TutorialPhase.ORPHEUS_ONLY
+                else:
+                    tutorial_phase = TextLevel.TutorialPhase.DEDUCTION_START
+            
+                res = self.tutorial_player.play(level=levels[i], phase=tutorial_phase)
+
+                i += 1
+        except KeyboardInterrupt:
+            return self.quit()
+                
+        self.last_profile.has_viewed_tut = True
+        self.last_profile.save()
+        return self.render()
 
 # endregion
 
@@ -345,7 +400,11 @@ class LevelMenu(Menu):
         super().__init__(debug=debug, rng=self.rng)
         self.profile = profile
 
-        self.tutorial_player = TutorialPlayer()
+        self.tutorial_player = TutorialPlayer(
+            profile=self.profile,
+            debug=self.debug,
+            rng=self.rng,
+        )
 
     def quit(self):
         self.profile.save()
@@ -411,19 +470,7 @@ class LevelMenu(Menu):
         level_info = self.profile.level_infos[choice_int]
 
         level = level_info.level()
-
-        tutorial_phase = TextLevel.TutorialPhase.NO_TUT
-        res = False
-
-        if not level_info.tutorial_complete:
-            if level.orpheus_only:
-                tutorial_phase = TextLevel.TutorialPhase.ORPHEUS_ONLY
-            else:
-                tutorial_phase = TextLevel.TutorialPhase.DEDUCTION_START
-        
-            res = self.tutorial_player.play(level, tutorial_phase)
-        else:
-            res = level.run()
+        res = level.run()
 
         if res:
             self.profile.level_infos[choice_int].tutorial_complete = True
@@ -440,15 +487,46 @@ class LevelMenu(Menu):
 
         self.render(not self.profile.has_viewed_intro) 
     
-    def render(self, play_intro: t.Optional[bool] = False):
+    def render(self,
+               play_intro: t.Optional[bool] = False,
+               play_tutorial: t.Optional[bool] = False,
+        ):
         try:
             self.text_utility.clear_screen()
 
             if play_intro:
-                res = self.tutorial_player.play(level=None, phase=TextLevel.TutorialPhase.INTRO)
+                try:
+                    res = self.tutorial_player.play(level=None, phase=TextLevel.TutorialPhase.INTRO)
+                except KeyboardInterrupt:
+                    return self.quit()
+                
                 if res:
                     self.profile.has_viewed_intro = True
-                self.profile.save()
+                    self.profile.save()
+
+            if play_tutorial:
+                levels = self.tutorial_player.load_tut_levels()
+
+                i = 0
+                res = True
+                
+                try:
+                    print(f"i: {i}")
+                    while res and (i < len(levels)):
+                        if levels[i].orpheus_only:
+                            print("setting phase to orpheus only")
+                            tutorial_phase = TextLevel.TutorialPhase.ORPHEUS_ONLY
+                        else:
+                            print("setting phase to orpheus start")
+                            tutorial_phase = TextLevel.TutorialPhase.DEDUCTION_START
+                    
+                        res = self.tutorial_player.play(level=levels[i], phase=tutorial_phase)
+                        i += 1
+                except KeyboardInterrupt:
+                    return self.quit()
+                        
+                self.profile.has_viewed_tut = True
+                self.profile.save()     
 
             choice = self.text_utility.menu_screen(lines=self.get_level_strs(), is_submenu=True, additional_prompt=f"Welcome, {TextUtility.blue(self.profile.name)}.")
             valid, err = self.validate_level_selection(choice)

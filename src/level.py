@@ -273,7 +273,7 @@ class TextLevel(Level):
         self.print_requirement()
 
     def reset(self):
-        self.level.reset()
+        self.level.reset(given_seed=self.level.seed)
 
     def phase(self) -> Phase:
         if self.orpheus_only or \
