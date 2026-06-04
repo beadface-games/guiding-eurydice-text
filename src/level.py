@@ -64,6 +64,7 @@ class TextLevel(Level):
         fail_text: t.Optional[t.List[str]] = None,
         fatal_text: t.Optional[t.List[str]] = None,
         thwart_line: t.Optional[t.List[str]] = "In your attempts to guide her, you have left Eurydice with no path forward.",
+        requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         given_seed: t.Optional[int] = None,
     ) -> None:
@@ -81,7 +82,6 @@ class TextLevel(Level):
         self.fatal_text = fatal_text or []
         self.thwart_line = thwart_line or "In your attempts to guide her, you have left Eurydice with no path forward."
 
-
         l = lyre or Lyre()
 
         og = orpheus_goal or Goal()
@@ -92,7 +92,6 @@ class TextLevel(Level):
         self.phase_prompt_idx = 0
         self.fail_idx = 0
         self.fatal_idx = 0
-        self.requirement_verb_idx = 0
 
         self.debug = debug
 
@@ -108,6 +107,9 @@ class TextLevel(Level):
             debug=self.debug,
             given_seed=given_seed,
         )   
+
+        self.requirement_verb_idx = self.level.rng.randint(0, len(self.REQUIREMENT_VERBS))
+        self.requirement_verb = requirement_verb or self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
 
         self.text_utility = TextUtility(
             rng=self.level.rng,
@@ -384,18 +386,17 @@ class TextLevel(Level):
         requirement_line = ""
 
         if curr_phase == self.Phase.ORPHEUS:
-            requirement_line += "You" 
+            requirement_line += self.text_utility.blue("You") 
         elif curr_phase == self.Phase.DEDUCTION:
             requirement_line += self.challenge_name
         
         requirement_line += " "
-        requirement_verb = self.REQUIREMENT_VERBS[self.requirement_verb_idx % len(self.REQUIREMENT_VERBS)]
 
         if (curr_phase == self.Phase.DEDUCTION and self.challenge_number > 1) or \
             (curr_phase == self.Phase.ORPHEUS):
-            requirement_line += requirement_verb.plur()
+            requirement_line += self.requirement_verb.plur()
         else:
-            requirement_line += requirement_verb.sing()
+            requirement_line += self.requirement_verb.sing()
 
         requirement_line += ": "
         
@@ -405,7 +406,6 @@ class TextLevel(Level):
             requirement_line += "?"
         
         print(requirement_line)
-        self.requirement_verb_idx += 1
 
     def get_header(
         self,

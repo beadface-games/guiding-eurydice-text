@@ -7,7 +7,7 @@ from enum import Enum
 
 from guiding_eurydice_core.src.lyre import Lyre, Note
 
-from src.level import TextLevel
+from src.level import RequirementVerb, TextLevel
 from src.profile import Profile
 from src._utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility
 
@@ -99,7 +99,7 @@ NOTE_NAME_LINES = [
 NOTE_VALUE_LINES = [
     "Each note also has a " + TextUtility.yellow("value") + ".",
     "When you play a note, its " + TextUtility.yellow("value") + " will be added to your ",
-    TextUtility.blue("melody") + ".",
+    TextUtility.cyan("melody") + ".",
 ]
 
 NOTE_REMAINING_LINES = [
@@ -109,9 +109,9 @@ NOTE_REMAINING_LINES = [
 ]
 
 TARGET_VALUE_LINES = [
-    "You want to play notes that add up to the " + TextUtility.blue("song you"),
+    "You want to play notes that add up to the " + TextUtility.cyan("song you"),
     "You can play as many notes as you like",
-    "to reach the " + TextUtility.blue("song") + ". Just make sure not to",
+    "to reach the " + TextUtility.cyan("song") + ". Just make sure not to",
     "overplay " + TextUtility.red("exhausted") + " notes.",
 ]
 
@@ -173,11 +173,15 @@ class SumHighlightMode(Enum):
 class TutorialUtility:
     def __init__(
         self,
+        requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
     ):
         self.debug = debug
         self.rng = rng or random.Random()
+
+        self.requirement_verb_idx = self.rng.randint(0, len(TextLevel.REQUIREMENT_VERBS))
+        self.requirement_verb = requirement_verb or TextLevel.REQUIREMENT_VERBS[self.requirement_verb_idx % len(TextLevel.REQUIREMENT_VERBS)]
 
         self.text_utility = TextUtility(
             debug=self.debug,
@@ -240,18 +244,17 @@ class TutorialUtility:
         requirement_line = ""
 
         if curr_phase == level.Phase.ORPHEUS:
-            requirement_line += "You" 
+            requirement_line += self.text_utility.blue("You")
         elif curr_phase == level.Phase.DEDUCTION:
             requirement_line += level.challenge_name
         
         requirement_line += " "
-        requirement_verb = level.REQUIREMENT_VERBS[level.requirement_verb_idx % len(level.REQUIREMENT_VERBS)]
 
         if (curr_phase == level.Phase.DEDUCTION and level.challenge_number > 1) \
             or (curr_phase == level.Phase.ORPHEUS):
-            requirement_line += requirement_verb.plur()
+            requirement_line += self.requirement_verb.plur()
         else:
-            requirement_line += requirement_verb.sing()
+            requirement_line += self.requirement_verb.sing()
 
         requirement_line += ": "
         
@@ -264,13 +267,11 @@ class TutorialUtility:
     
     def print_requirement(
         self,
-        level: TextLevel, 
         requirement_line: str,
         highlight_color: t.Optional[str] = "",
     ):
         highlight_term = "\x1b[0m" if len(highlight_color) > 0 else ""
         print(highlight_color + requirement_line + highlight_term)
-        level.requirement_verb_idx += 1
 
     def get_mock_sum(
         self,
@@ -428,6 +429,7 @@ class TutorialStep:
         func: t.Optional[t.Callable[[None], str]] = None,
         tut_utility: t.Optional[TutorialUtility] = None,
         text_utility: t.Optional[TextUtility] = None,
+        requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
     ):
@@ -435,7 +437,11 @@ class TutorialStep:
         self.func = func
         self.debug = debug
         self.rng = rng or random.Random()
-        self.tut_utility = tut_utility or TutorialUtility(rng=self.rng, debug=self.debug)
+
+        self.requirement_verb_idx = self.rng.randint(0, len(TextLevel.REQUIREMENT_VERBS))
+        self.requirement_verb = requirement_verb or TextLevel.REQUIREMENT_VERBS[self.requirement_verb_idx % len(TextLevel.REQUIREMENT_VERBS)]
+
+        self.tut_utility = tut_utility or TutorialUtility(requirement_verb=self.requirement_verb, rng=self.rng, debug=self.debug)
         self.text_utility = text_utility or TextUtility(rng=self.rng, debug=self.debug)
 
     def get_func(
@@ -505,7 +511,7 @@ class TutorialStep:
         eq = ("=" * self.text_utility.get_term_width())
         req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum(
-            highlight_color="\x1b[34m",
+            highlight_color=TextUtility.CYAN,
             highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
         )
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
@@ -538,7 +544,7 @@ class TutorialStep:
             lyre_highlight_color=""
         )
         eq = ("=" * self.text_utility.get_term_width())
-        req_lines = TextUtility.cyan(req_line.split(":")[0]) + ":" + TextUtility.blue(req_line.split(":")[1])
+        req_lines = TextUtility.cyan(req_line.split(":")[0]) + ":" + TextUtility.cyan(req_line.split(":")[1])
         ms = self.tut_utility.get_mock_sum(
             highlight_color="",
             highlight_mode=SumHighlightMode.HIGHLIGHT_ALL,
@@ -581,7 +587,7 @@ class TutorialStep:
 
     def dt_step2(self) -> str:
         self.text_utility.clear_screen()
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             DEDUCTION_SUM_LINES,
@@ -607,7 +613,7 @@ class TutorialStep:
         ]
 
         self.text_utility.clear_screen()
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             deduction_addend_lines,
@@ -631,7 +637,7 @@ class TutorialStep:
         line_to_add = "Because you don't know the " + TextUtility.blue("song") + f" {TextUtility.cyan(req_line.split(":")[0])}, "
         if len(DEDUCTION_FAIL_LINES) == 3:
             DEDUCTION_FAIL_LINES.insert(0, line_to_add)
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             DEDUCTION_FAIL_LINES,
@@ -651,7 +657,7 @@ class TutorialStep:
 
     def dt_step5(self) -> str:
         self.text_utility.clear_screen()
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             DEDUCTION_DEDUCE_LINES,
@@ -681,7 +687,7 @@ class TutorialStep:
         ]
 
         self.text_utility.clear_screen()
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             thwart_lines,
@@ -699,7 +705,7 @@ class TutorialStep:
 
     def dt_step7(self) -> str:
         self.text_utility.clear_screen()
-        hdr = self.level.get_header()
+        hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             TRY_LINES,
@@ -721,17 +727,24 @@ class TutorialPlayer:
         self,
         profile: Profile,
         text_utility: t.Optional[TextUtility] = TextUtility(),
+        requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
         tut_data_dir: t.Optional[pathlib.Path] = None
     ):
         self.profile = profile
         self.text_utility = text_utility
+
         self.tut_data_dir = tut_data_dir or pathlib.Path(DEFAULT_TUT_DATA_DIR)
         self.debug = debug
         self.rng = rng or random.Random()
+        
+        self.requirement_verb_idx = self.rng.randint(0, len(TextLevel.REQUIREMENT_VERBS))
+        self.requirement_verb = requirement_verb or TextLevel.REQUIREMENT_VERBS[self.requirement_verb_idx % len(TextLevel.REQUIREMENT_VERBS)]
+
 
 # region consts
+
 
     INTRO_PAIRS: t.List[StoryScreen] = [
         StoryScreen(INTRO_LINES_1, back_enabled=False, skip_enabled=True),
@@ -811,6 +824,7 @@ class TutorialPlayer:
             ts = TutorialStep(
                 level=level,
                 text_utility=self.text_utility,
+                requirement_verb=self.requirement_verb,
                 debug=self.debug,
                 rng=self.rng,
             )
@@ -829,6 +843,7 @@ class TutorialPlayer:
             ts = TutorialStep(
                 level=level,
                 text_utility=self.text_utility,
+                requirement_verb=self.requirement_verb,
                 debug=self.debug,
                 rng=self.rng,
             )
