@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime as dt
+from pypresence import Presence
 
 import json
 import os
@@ -13,6 +14,8 @@ from src.level import TextLevel
 from src.profile import DEFAULT_LEVEL_DATA_DIR, DEFAULT_PROFILE_DATA_DIR, Profile
 from src.tutorial import TutorialPlayer
 from src._utils import B_FOR_BACK_STR_MENU, DEFAULT_TUT_DATA_DIR, UserDataManager, TextUtility
+
+DISCORD_APP_ID = "1512221477779411125"
 
 type MenuAction = t.Callable[[t.Any], Menu]
 
@@ -33,6 +36,7 @@ class Menu:
         self,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
+        presence: t.Optional[Presence] = None,
     ):
         self.debug = debug
         self.rng = rng or random.Random()
@@ -41,6 +45,12 @@ class Menu:
             debug=self.debug,
             rng=self.rng,
         )
+
+        if presence:
+            self.presence = presence
+        else:
+            self.presence = Presence(DISCORD_APP_ID)
+            self.presence.connect()
 
     def quit(self):
         self.text_utility.clear_screen()
@@ -56,10 +66,11 @@ class ProfileMenu(Menu):
         tut_data_dir: t.Optional[pathlib.Path] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
-        user_data_manager: t.Optional[UserDataManager] = UserDataManager()
+        user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
+        presence: t.Optional[Presence] = None,
     ):
         self.rng = rng or random.Random()
-        super().__init__(debug=debug, rng=self.rng)
+        super().__init__(debug=debug, rng=self.rng, presence=presence)
 
         self.user_data_manager = user_data_manager
         self.level_data_dir = save_data_dir or pathlib.Path(DEFAULT_LEVEL_DATA_DIR)
@@ -76,7 +87,12 @@ class ProfileMenu(Menu):
             profile=self.last_profile,
             debug=self.debug,
             rng=self.rng,
-            tut_data_dir=self.tut_data_dir)
+            tut_data_dir=self.tut_data_dir,
+            presence=self.presence,
+        )
+
+        if presence:
+            self.presence = presence
 
     def sort_options(
         self,
@@ -159,6 +175,7 @@ class ProfileMenu(Menu):
                         profile = Profile.load(
                             profile_data=data,
                             debug=self.debug,
+                            presence=self.presence,
                         )
                         self.profiles[profile.id] = profile
 
@@ -255,6 +272,9 @@ class ProfileMenu(Menu):
         prompt: t.Optional[str] = None,
     ) -> Menu:
         try:
+            self.presence.update(
+                state="Main Menu",
+            )
             self.reload_options()
             self.text_utility.clear_screen()
 
@@ -292,7 +312,8 @@ class ProfileMenu(Menu):
         LevelMenu.from_profile(
             self.last_profile,
             debug=self.debug,
-            rng=self.rng
+            rng=self.rng,
+            presence=self.presence,
         ).render(
             not self.last_profile.has_viewed_intro,
             not self.last_profile.has_viewed_tut,
@@ -326,7 +347,12 @@ class ProfileMenu(Menu):
             profile = profile_map[int(choice)]
             self.last_profile = profile
             self.last_profile.save()
-            LevelMenu.from_profile(profile).render(not profile.has_viewed_intro)
+            LevelMenu.from_profile(
+                profile=profile,
+                debug=self.debug,
+                rng=self.rng,
+                presence=self.presence,
+            ).render(not profile.has_viewed_intro)
         except KeyboardInterrupt:
             self.quit()
 
@@ -394,16 +420,22 @@ class LevelMenu(Menu):
         self,
         profile: Profile,
         debug: t.Optional[bool] = False,
-        rng: t.Optional[random.Random] = None
+        rng: t.Optional[random.Random] = None,
+        presence: t.Optional[Presence] = None,
     ):
         self.rng = rng or random.Random()
-        super().__init__(debug=debug, rng=self.rng)
+        super().__init__(debug=debug, rng=self.rng, presence=presence)
         self.profile = profile
+
+        self.presence = None
+        if presence:
+            self.presence = presence
 
         self.tutorial_player = TutorialPlayer(
             profile=self.profile,
             debug=self.debug,
             rng=self.rng,
+            presence=presence,
         )
 
     def quit(self):
@@ -414,12 +446,14 @@ class LevelMenu(Menu):
     def from_profile(
         profile: Profile,
         debug: t.Optional[bool] = False,
-        rng: t.Optional[random.Random] = None
+        rng: t.Optional[random.Random] = None,
+        presence: t.Optional[Presence] = None,
     ) -> LevelMenu:
         return LevelMenu(
             profile=profile,
             debug=debug,
-            rng=rng or random.Random()
+            rng=rng or random.Random(),
+            presence=presence,
         )
 
     def get_level_strs(self) -> t.List[str]:
@@ -445,7 +479,8 @@ class LevelMenu(Menu):
         if choice.upper() == "B":
             ProfileMenu(
                 debug=self.debug,
-                rng = self.rng
+                rng = self.rng,
+                presence=self.presence,
             ).render()
         elif choice.upper() == "Q":
             self.quit()
@@ -526,7 +561,10 @@ class LevelMenu(Menu):
                     return self.quit()
                         
                 self.profile.has_viewed_tut = True
-                self.profile.save()     
+                self.profile.save()   
+
+            if self.presence:
+                self.presence.update(state="Level Selection")  
 
             choice = self.text_utility.menu_screen(lines=self.get_level_strs(), is_submenu=True, additional_prompt=f"Welcome, {TextUtility.blue(self.profile.name)}.")
             valid, err = self.validate_level_selection(choice)

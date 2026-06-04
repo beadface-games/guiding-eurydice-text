@@ -5,6 +5,7 @@ import pathlib
 import typing as t
 
 from datetime import datetime as dt
+from pypresence import Presence
 
 from src.level import TextLevel
 from src._utils import (
@@ -81,7 +82,8 @@ class LevelInfo():
         stats: t.Optional[LevelInfo.Stats] = None,
         locked: t.Optional[bool] = True,
         debug: t.Optional[bool] = False,
-        user_data_manager: t.Optional[UserDataManager] = UserDataManager()
+        user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
+        presence: t.Optional[Presence] = None,
     ):
         if not id:
             raise ValueError(f"No ID provided for profile at path {level_path}")
@@ -98,6 +100,10 @@ class LevelInfo():
 
         self.stats = stats or Stats()
         self.debug = debug
+
+        self.presence = None
+        if presence:
+            self.presence = presence
 
     def __str__(self) -> str:
         res = ""
@@ -126,6 +132,7 @@ class LevelInfo():
         id: int,
         level_data: t.Dict[str, t.Any],
         debug: t.Optional[bool] = False,
+        presence: t.Optional[Presence] = None,
     ) -> LevelInfo:
         title = None
         level_path = None
@@ -150,13 +157,15 @@ class LevelInfo():
             level_path=level_path,
             locked=locked,
             stats=stats,
-            debug=debug
+            debug=debug,
+            presence=presence,
         )
 
     def level(self) -> TextLevel:
         return TextLevel.from_json(
             json_path=self.user_data_manager.resource_path(self.level_path),
             debug=self.debug,
+            presence=self.presence,
         )
 
 class Profile():
@@ -198,7 +207,8 @@ class Profile():
     @staticmethod
     def load(
         profile_data: t.Dict[str, t.Any],
-        debug: t.Optional[bool] = False
+        debug: t.Optional[bool] = False,
+        presence: t.Optional[Presence] = None,
     ) -> Profile:
         id = None
         name = None
@@ -231,7 +241,7 @@ class Profile():
             for i, lid in profile_data["level_info"].items():
                 id_int = int(i)
                 if (isinstance(lid, dict)):
-                    level_info = LevelInfo.from_dict(id=id_int, level_data=lid)
+                    level_info = LevelInfo.from_dict(id=id_int, level_data=lid, presence=presence)
                     level_infos[id_int] = level_info
 
         if ("level_data_dir" in profile_data.keys()) and (isinstance(profile_data["level_data_dir"], str)):
@@ -339,6 +349,7 @@ class Profile():
                         stats=Stats(),
                         locked=True,
                         debug=self.debug,
+                        presence=self.presence,
                     )
             
                     level_infos[id] = level_info

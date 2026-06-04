@@ -4,6 +4,7 @@ import random
 import typing as t
 
 from enum import Enum
+from pypresence import Presence
 
 from guiding_eurydice_core.src.lyre import Lyre, Note
 
@@ -730,7 +731,8 @@ class TutorialPlayer:
         requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
-        tut_data_dir: t.Optional[pathlib.Path] = None
+        tut_data_dir: t.Optional[pathlib.Path] = None,
+        presence: t.Optional[Presence] = None,
     ):
         self.profile = profile
         self.text_utility = text_utility
@@ -738,6 +740,10 @@ class TutorialPlayer:
         self.tut_data_dir = tut_data_dir or pathlib.Path(DEFAULT_TUT_DATA_DIR)
         self.debug = debug
         self.rng = rng or random.Random()
+
+        self.presence = None
+        if presence:
+            self.presence = presence
         
         self.requirement_verb_idx = self.rng.randint(0, len(TextLevel.REQUIREMENT_VERBS))
         self.requirement_verb = requirement_verb or TextLevel.REQUIREMENT_VERBS[self.requirement_verb_idx % len(TextLevel.REQUIREMENT_VERBS)]
@@ -795,7 +801,11 @@ class TutorialPlayer:
         
         levels = []
         for f in tuts:
-            tl = TextLevel.from_json(self.tut_data_dir.joinpath(f))
+            tl = TextLevel.from_json(
+                json_path=self.tut_data_dir.joinpath(f),
+                debug=self.debug,
+                presence=self.presence,
+            )
             levels.append(tl)
         
         return sorted(levels)
@@ -884,10 +894,16 @@ class TutorialPlayer:
 
         try:
             if phase == TextLevel.TutorialPhase.INTRO:
+                if self.presence:
+                    self.presence.update(state="Introduction")
+
                 steps = self.get_intro_steps()
                 res = _run_tut_steps()
 
             elif (phase == TextLevel.TutorialPhase.ORPHEUS_ONLY):
+                if self.presence:
+                    self.presence.update(state="Tutorial")
+
                 steps = self.get_orpheus_steps(level)
                 res = _run_tut_steps()
 
@@ -895,6 +911,9 @@ class TutorialPlayer:
                     res = level.run(tutorial_phase=phase)
 
             elif (phase == TextLevel.TutorialPhase.DEDUCTION_START):
+                if self.presence:
+                    self.presence.update(state="Tutorial")
+
                 steps = self.get_deduction_steps(level)
                 res = level.run(tutorial_phase=phase)
             

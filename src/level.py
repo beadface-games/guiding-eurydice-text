@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 from enum import Enum
+from pypresence import Presence
 
 import json
 import pathlib
-import sys
 import time
 import typing as t
 
@@ -67,6 +67,7 @@ class TextLevel(Level):
         requirement_verb: t.Optional[RequirementVerb] = None,
         debug: t.Optional[bool] = False,
         given_seed: t.Optional[int] = None,
+        presence: t.Optional[Presence] = None,
     ) -> None:
         print("received id", id)
         self.id = id or None
@@ -116,6 +117,10 @@ class TextLevel(Level):
             debug=self.debug,
         )
 
+        self.presence = None
+        if presence:
+            self.presence = presence
+
         if self.debug:
             print("CREATED NEW TEXT LEVEL")
             print(f"id: {self.id}")
@@ -148,6 +153,7 @@ class TextLevel(Level):
         json_path: pathlib.Path,
         debug: t.Optional[bool] = False,
         seed: t.Optional[int] = None,
+        presence: t.Optional[Presence] = None,
     ) -> TextLevel:
         id = None
         title = None
@@ -264,6 +270,7 @@ class TextLevel(Level):
                 debug=debug,
                 given_seed=seed,
                 thwart_line=thwart_line,
+                presence=presence,
             )
 
     def print(self):
@@ -347,6 +354,9 @@ class TextLevel(Level):
 
                 print(self.text_utility.story_screen(top_lines=demise_strs))
             
+            if self.presence:
+                self.presence.update(state="Looking back...")
+            
             if self.level.state == Level.LevelState.ORPHEUS_FATAL:
                 self.print_fatal_msg()
                 self.fatal_idx += 1
@@ -361,6 +371,8 @@ class TextLevel(Level):
         self,
         broken_string: Note,        
     ):
+        if self.presence:
+            self.presence.update(state="Broke a string")
         if not self.debug:
             self.text_utility.clear_screen()
 
@@ -407,13 +419,16 @@ class TextLevel(Level):
         
         print(requirement_line)
 
+    def get_title(self) -> str:
+        return f"LEVEL {self.level.id}: {self.title.upper()}"
+
     def get_header(
         self,
         omit_description: t.Optional[bool] = False
     ) -> str:
         res = ""
 
-        title_line = f"LEVEL {self.level.id}: {self.title.upper()} - seed={str(self.level.seed)} (Q to Quit)"
+        title_line = self.get_title() + " - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
@@ -467,6 +482,10 @@ class TextLevel(Level):
         print(self.level)
 
     def print_success_msg(self, linger_time_s: t.Optional[int]=3):
+        if self.presence:
+            if len(self.success_text) == 1:
+                self.presence.update(state=self.success_text[0])
+
         if not self.debug:
             self.text_utility.clear_screen()
 
@@ -485,6 +504,11 @@ class TextLevel(Level):
 
     def print_fail_msg(self, linger_time_s: t.Optional[int]=3):
         fail_msg = self.fail_text[self.fail_idx % len(self.fail_text)]
+        
+        if self.presence:
+            if len(fail_msg) == 1:
+                self.presence.update(state=fail_msg)
+
         if not self.debug:
             self.text_utility.clear_screen()
             print(self.text_utility.center_text(fail_msg))
@@ -497,6 +521,10 @@ class TextLevel(Level):
 
     def print_fatal_msg(self, linger_time_s: t.Optional[int]=3):
         fatal_msg = self.fatal_text[self.fatal_idx % len(self.fatal_text)]
+
+        if self.presence:
+            if len(fatal_msg) == 1:
+                self.presence.update(state=fatal_msg)
 
         if not self.debug:
             self.text_utility.clear_screen()
@@ -614,6 +642,11 @@ class TextLevel(Level):
             return total, len(notes)
 
         try:  
+
+            if (tutorial_phase == TextLevel.TutorialPhase.NO_TUT):
+                if self.presence:
+                    self.presence.update(state=self.get_title())
+                    
             if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
                 self.state = Level.LevelState.ORPHEUS_SUCCESS
             else:
