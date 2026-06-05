@@ -1,6 +1,7 @@
 import os
 import pathlib
 import random
+import time
 import typing as t
 
 from enum import Enum
@@ -10,7 +11,7 @@ from guiding_eurydice_core.src.lyre import Lyre, Note
 
 from src.level import RequirementVerb, TextLevel
 from src.profile import Profile
-from src._utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility
+from src.utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility
 
 # region intro lines
 
@@ -118,7 +119,7 @@ TARGET_VALUE_LINES = [
 
 FINISHING_LINES = [
     "Once you are satisfied with your song and",
-    "would like to finish playing, press X and ",
+    "would like to finish playing, press P and ",
     "then <Enter>.",
     "",
     "Give it a try!"
@@ -887,6 +888,9 @@ class TutorialPlayer:
                 return True
             except KeyboardInterrupt:
                 print("Goodbye")
+                self.presence.clear()
+                self.presence.close()
+                time.sleep(0.5)
                 SystemExit(0)       
 
         res = False
@@ -929,6 +933,9 @@ class TutorialPlayer:
                 raise ValueError(f"Unexpected phase", phase)
         except KeyboardInterrupt:
             print("Goodbye.")
+            self.presence.clear()
+            self.presence.close()
+            time.sleep(0.5)
             SystemExit(0)
         
         return res

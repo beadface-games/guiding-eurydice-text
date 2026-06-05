@@ -12,7 +12,7 @@ import typing as t
 from guiding_eurydice_core.src.difficulty import Difficulty
 from guiding_eurydice_core.src.lyre import Lyre, Note
 from guiding_eurydice_core.src.level import Goal, Level
-from src._utils import UserDataManager, RequirementVerb, TextUtility
+from src.utils import UserDataManager, RequirementVerb, TextUtility
 
 
 DIFFICULTY_JSON_PATH = UserDataManager().resource_path("guiding_eurydice_levels/difficulty_settings.json")
@@ -308,6 +308,8 @@ class TextLevel(Level):
                     min_time_in_ms_per_it=250,
                 )
             time.sleep(1)
+        self.presence.clear()
+        self.presence.close()
         raise SystemExit(0)
     
     def quit_or_try_again(self) -> bool:
@@ -571,14 +573,14 @@ class TextLevel(Level):
             self.phase_prompt_idx += 1
             print("-" * self.text_utility.get_term_width())
 
-        lyre_prompt = "Type the name of a note and press Enter to play it. Press X to finish your song."
+        lyre_prompt = "Type the name of a note and press Enter to play it. Press P to finish your song."
 
         print(lyre_prompt)
         print("=" * self.text_utility.get_term_width())
 
     def read_note(
         self,
-        notes: t.List[Note],
+        notes: t.Optional[t.List[Note]],
         total: int,
         warning: t.Optional[str]="",
     ) -> str:
@@ -607,27 +609,81 @@ class TextLevel(Level):
                 notes,
                 total,
             )
+            special_letters = [
+                "P", # finish song
+                "Q", # quit
+            ]
 
-            while (i.upper() != "X") and (i.upper() != "Q"):
-                note = self.level.lyre.get_note(i)
-                skip = False
+            special_symbols = [
+                "X", # eliminate
+                "?", # question
+                "!", # check
+            ]
+
+            while (i.upper() not in special_letters):
                 warning = ""
+                skip = False
 
-                try:
-                    note = self.level.lyre.play_note(i)
-                except Lyre.NoSuchNoteException:
-                    warning = "Your lyre has no such string."
-                    skip = True
-                except Lyre.NoteDepletedException:
-                    warning = "You can't play that note anymore."
-                    skip = True
-                except Lyre.BrokenStringException:
-                    self.end_with_broken_string(note)
-                    skip = True
+                sym_matches = [x for x in special_symbols if x.upper() in i.upper()]
+                if len(sym_matches) == 1:
+                    stripped = i.upper().strip()
+                    char = ""
+                    if "X" in stripped:
+                        char = "X"
+                    elif "?" in stripped:
+                        char = "?"
+                    elif "!" in stripped:
+                        char = "!"
+                    else:
+                        raise ValueError(f"Unintelligible scratchpad note found: {stripped}")
 
-                if not skip:
-                    notes.append(note)
-                    total += note.val
+                    id_str = ""
+                    id = None
+                    try:
+                        id_str = stripped[:-1]
+                        id = int(id_str)
+                    except ValueError:
+                        warning = f"{id_str} isn't a valid note"
+                        skip = True
+
+                    if not id:
+                        warning = f"{id_str} isn't a valid note"
+                        skip = True
+                    else:
+                        note = self.level.lyre.get_note_by_id(id)
+
+                        if not note:
+                            warning = f"{id} isn't a valid note ID."
+                            skip = True
+                        else:
+
+                            if char == "X":
+                                note.eliminate()
+                            elif char == "?":
+                                note.question()
+                            elif char == "!":
+                                note.check()
+                            else:
+                                raise ValueError(f"Unintelligible scratchpad char found: {char}")
+                else:
+                    note = self.level.lyre.get_note_by_name(i)
+
+                    if not skip:
+                        try:
+                            note = self.level.lyre.play_note(i)
+                        except Lyre.NoSuchNoteException:
+                            warning = "Your lyre has no such string."
+                            skip = True
+                        except Lyre.NoteDepletedException:
+                            warning = "You can't play that note anymore."
+                            skip = True
+                        except Lyre.BrokenStringException:
+                            self.end_with_broken_string(note)
+                            skip = True
+
+                    if not skip:
+                        notes.append(note)
+                        total += note.val
 
                 self.print()
                 i = self.read_note(

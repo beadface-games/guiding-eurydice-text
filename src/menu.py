@@ -13,7 +13,7 @@ import typing as t
 from src.level import TextLevel
 from src.profile import DEFAULT_LEVEL_DATA_DIR, DEFAULT_PROFILE_DATA_DIR, Profile
 from src.tutorial import TutorialPlayer
-from src._utils import B_FOR_BACK_STR_MENU, DEFAULT_TUT_DATA_DIR, UserDataManager, TextUtility
+from src.utils import B_FOR_BACK_STR_MENU, DEFAULT_TUT_DATA_DIR, UserDataManager, TextUtility
 
 DISCORD_APP_ID = "1512221477779411125"
 
@@ -55,6 +55,8 @@ class Menu:
     def quit(self):
         self.text_utility.clear_screen()
         print(self.text_utility.center_text("Goodbye."))
+        self.presence.clear()
+        self.presence.close()
         time.sleep(0.5)
         raise SystemExit(0)        
 

@@ -8,7 +8,7 @@ from datetime import datetime as dt
 from pypresence import Presence
 
 from src.level import TextLevel
-from src._utils import (
+from src.utils import (
     DATE_FORMAT_STR,
     DEFAULT_LEVEL_DATA_DIR,
     DEFAULT_PROFILE_DATA_DIR,
