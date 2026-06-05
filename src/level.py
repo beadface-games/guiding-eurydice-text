@@ -308,8 +308,9 @@ class TextLevel(Level):
                     min_time_in_ms_per_it=250,
                 )
             time.sleep(1)
-        self.presence.clear()
-        self.presence.close()
+        if self.presence:
+            self.presence.clear()
+            self.presence.close()
         raise SystemExit(0)
     
     def quit_or_try_again(self) -> bool:
@@ -430,7 +431,7 @@ class TextLevel(Level):
     ) -> str:
         res = ""
 
-        title_line = self.get_title() + " - seed={str(self.level.seed)} (Q to Quit)"
+        title_line = self.get_title() + f" - seed={str(self.level.seed)} (Q to Quit)"
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
@@ -574,8 +575,10 @@ class TextLevel(Level):
             print("-" * self.text_utility.get_term_width())
 
         lyre_prompt = "Type the name of a note and press Enter to play it. Press P to finish your song."
+        scratchpad_prompt = "<note ID>" + TextUtility.green("!") + TextUtility.yellow("?") + TextUtility.red("X") + " to mark note."
 
         print(lyre_prompt)
+        print(scratchpad_prompt)
         print("=" * self.text_utility.get_term_width())
 
     def read_note(
@@ -626,7 +629,7 @@ class TextLevel(Level):
 
                 sym_matches = [x for x in special_symbols if x.upper() in i.upper()]
                 if len(sym_matches) == 1:
-                    stripped = i.upper().strip()
+                    stripped = i.upper().strip().replace(" ", "")
                     char = ""
                     if "X" in stripped:
                         char = "X"
@@ -647,7 +650,11 @@ class TextLevel(Level):
                         skip = True
 
                     if not id:
-                        warning = f"{id_str} isn't a valid note"
+                        if len(id_str) == 0:
+                            warning = "Don't forget the note ID when marking a note."
+                        else:
+                            warning = f"{id_str} isn't a valid note"
+
                         skip = True
                     else:
                         note = self.level.lyre.get_note_by_id(id)
@@ -698,7 +705,6 @@ class TextLevel(Level):
             return total, len(notes)
 
         try:  
-
             if (tutorial_phase == TextLevel.TutorialPhase.NO_TUT):
                 if self.presence:
                     self.presence.update(state=self.get_title())

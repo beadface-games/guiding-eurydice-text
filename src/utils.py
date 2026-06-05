@@ -15,11 +15,11 @@ from colorama import just_fix_windows_console
 APP_NAME = "GuidingEurydice"
 
 OPTION_SELECT_STR = "Please enter the number of the option you wish to select and press <Enter>."
-B_FOR_BACK_STR_MENU = "Enter B followed by <Enter> to go back to the previous menu."
-B_FOR_BACK_STR_SCREEN = "Enter B followed by <Enter> to return to the previous screen."
-Q_TO_QUIT_STR = "Enter Q followed by <Enter> to quit."
-Q_TO_MENU_STR = "Enter Q followed by <Enter> to return to the level menu."
-S_TO_SKIP_STR = "Enter S followed by <Enter> to skip."
+B_FOR_BACK_STR_MENU = "B <enter>: go back to the previous menu."
+B_FOR_BACK_STR_SCREEN = "B <enter>: return to the previous screen."
+Q_TO_QUIT_STR = "Q <enter>: quit."
+Q_TO_MENU_STR = "Q <enter>: return to the level menu."
+S_TO_SKIP_STR = "S <enter>: skip."
 PROMPT_STR = ">"
 
 
@@ -63,7 +63,7 @@ class UserDataManager:
         return self.get_metadata_dir() / "metadata.json"
     
 udm = UserDataManager()
-CONTINUE_PROMPT = "Press <Enter> to continue."
+CONTINUE_PROMPT = "Press <enter> to continue."
 DEFAULT_LEVEL_DATA_DIR = "guiding_eurydice_levels/levels"
 DEFAULT_TUT_DATA_DIR = "guiding_eurydice_levels/levels"
 

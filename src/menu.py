@@ -37,6 +37,7 @@ class Menu:
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
         presence: t.Optional[Presence] = None,
+        nix_presence: t.Optional[bool] = True,
     ):
         self.debug = debug
         self.rng = rng or random.Random()
@@ -46,17 +47,21 @@ class Menu:
             rng=self.rng,
         )
 
+        self.presence = None
         if presence:
             self.presence = presence
-        else:
+        elif not nix_presence:
             self.presence = Presence(DISCORD_APP_ID)
             self.presence.connect()
 
     def quit(self):
         self.text_utility.clear_screen()
         print(self.text_utility.center_text("Goodbye."))
-        self.presence.clear()
-        self.presence.close()
+
+        if self.presence:
+            self.presence.clear()
+            self.presence.close()
+
         time.sleep(0.5)
         raise SystemExit(0)        
 
@@ -70,6 +75,7 @@ class ProfileMenu(Menu):
         rng: t.Optional[random.Random] = None,
         user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
         presence: t.Optional[Presence] = None,
+        nix_presence: t.Optional[bool] = True,
     ):
         self.rng = rng or random.Random()
         super().__init__(debug=debug, rng=self.rng, presence=presence)
@@ -274,9 +280,11 @@ class ProfileMenu(Menu):
         prompt: t.Optional[str] = None,
     ) -> Menu:
         try:
-            self.presence.update(
-                state="Main Menu",
-            )
+            if self.presence:
+                self.presence.update(
+                    state="Main Menu",
+                )
+                
             self.reload_options()
             self.text_utility.clear_screen()
 
