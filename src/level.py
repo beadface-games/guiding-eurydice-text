@@ -329,9 +329,15 @@ class TextLevel(Level):
         self.run(tutorial_phase=self.tutorial_phase)
         return True
 
-    def end(self):
+    def end(
+            self,
+            selfish: t.Optional[bool] = False,
+            ):
         if self.level.state == Level.LevelState.SUCCESS:
             return
+        
+        if selfish:
+            self.end_selfish()
         
         if (self.challenge_name != "Eurydice"):
             self.print_fatal_msg()
@@ -339,6 +345,30 @@ class TextLevel(Level):
             self.quit_or_try_again()
         else:
             self.end_with_look()
+
+    def end_selfish(
+            self,
+            linger_time_s: t.Optional[float] = 0.5
+            ):
+        msg = "In your efforts to soothe yourself, you have used too many notes to"
+        if self.challenge_name == "Eurydice":
+            msg += " guide "
+        else:
+            msg += " satisfy "
+        msg += self.challenge_name
+        
+        if self.presence:
+            self.presence.update(state=msg)
+
+        if not self.debug:
+            self.text_utility.clear_screen()
+            print(self.text_utility.center_text(msg))
+            time.sleep(linger_time_s)
+            self.text_utility.wait_for_enter()
+        else:
+            print(self.text_utility.center_text(msg))
+        
+        self.quit_or_try_again()
 
     def end_with_look(self):            
             def _force_look_back():
@@ -745,11 +775,12 @@ class TextLevel(Level):
             if not self.orpheus_only:
                 if self.tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
                     return True
-                
-                if (self.tutorial_phase == TextLevel.TutorialPhase.NO_TUT) or \
-                    (self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START) or \
-                    (self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END):    
-                    self.level.set_eurydice_goal()
+  
+                goal_set = self.level.set_eurydice_goal()
+                _ = input("<enter>")
+
+                if not goal_set:
+                    self.end(selfish=True)
                 
                 if self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START:
                     return self
@@ -797,8 +828,7 @@ class TextLevel(Level):
                         if self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
                             self.level.state = Level.LevelState.READY
 
-                        self.print_fatal_msg()
-                        return self.quit_or_try_again()
+                        self.end()
                     
                     elif self.level.state == Level.LevelState.SUCCESS:
                         self.print_success_msg()

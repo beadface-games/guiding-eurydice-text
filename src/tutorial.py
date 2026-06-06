@@ -154,7 +154,9 @@ DEDUCTION_NOTE_POOL_LINES = [
     "Furthermore, you have only the notes remaining",
     "from your last song. Any notes you " + TextUtility.red("exhausted"),
     "while playing for yourself are still",
-    "unavailable to you."
+    "unavailable to you. In some cases, if you have",
+    TextUtility.red("exhausted") + " too many notes while",
+    "playing for yourself, it may be impossible to",
 ]
 
 DEDUCTION_FAIL_LINES = [
@@ -665,6 +667,13 @@ class TutorialStep:
     def dt_step3(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
+        line_to_insert = "play the song " + req_line.split(":")[0] + "."
+        DEDUCTION_NOTE_POOL_LINES.insert(
+            len(DEDUCTION_NOTE_POOL_LINES),
+            line_to_insert,
+        )
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             DEDUCTION_NOTE_POOL_LINES,
@@ -672,8 +681,6 @@ class TutorialStep:
             lyre_highlight_color="",
         )
         eq = ("=" * self.text_utility.get_term_width())
-        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
-        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
         ms = self.tut_utility.get_mock_sum(
             highlight_color="",
             highlight_mode=SumHighlightMode.NO_HIGHLIGHT,
