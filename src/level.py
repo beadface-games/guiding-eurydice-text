@@ -83,7 +83,7 @@ class TextLevel(Level):
         self.fatal_text = fatal_text or []
         self.thwart_line = thwart_line or "In your attempts to guide her, you have left Eurydice with no path forward."
 
-        l = lyre or Lyre()
+        l = lyre or None
 
         og = orpheus_goal or Goal()
 
