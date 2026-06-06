@@ -147,7 +147,14 @@ FINISHING_LINES = [
 
 DEDUCTION_SUM_LINES = [
     "You will play your lyre as before, but this",
-    "time, the " + TextUtility.blue("desired song") + " is a mystery."
+    "time, the " + TextUtility.blue("desired song") + " is a mystery.",
+]
+
+DEDUCTION_NOTE_POOL_LINES = [
+    "Furthermore, you have only the notes remaining",
+    "from your last song. Any notes you " + TextUtility.red("exhausted"),
+    "while playing for yourself are still",
+    "unavailable to you."
 ]
 
 DEDUCTION_FAIL_LINES = [
@@ -505,20 +512,6 @@ class TutorialStep:
         req_lines = self.tut_utility.get_requirement(self.level)
         ms = self.tut_utility.get_mock_sum()
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
-    
-    def ot_step4(self) -> str:
-        self.text_utility.clear_screen()
-        hdr = self.level.get_header(omit_description=True)
-        lr = self.tut_utility.get_lyre_with_lines(
-            self.level.level.lyre,
-            NOTE_ID_LINES,
-            LyreHighlightMode.NO_HIGHLIGHT,
-            lyre_highlight_color=TextUtility.YELLOW
-            )
-        eq = ("=" * self.text_utility.get_term_width())
-        req_lines = self.tut_utility.get_requirement(self.level)
-        ms = self.tut_utility.get_mock_sum()
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step2(self) -> str:
         self.text_utility.clear_screen()
@@ -534,6 +527,19 @@ class TutorialStep:
         ms = self.tut_utility.get_mock_sum()
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
+    def ot_step4(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
+            NOTE_ID_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color=TextUtility.YELLOW
+            )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum()
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
     def ot_step5(self) -> str:
         self.text_utility.clear_screen()
@@ -654,9 +660,30 @@ class TutorialStep:
             phase=TextLevel.Phase.DEDUCTION,
             level=self.level,
         )
-        self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
     def dt_step3(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
+            DEDUCTION_NOTE_POOL_LINES,
+            LyreHighlightMode.NO_HIGHLIGHT,
+            lyre_highlight_color="",
+        )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level).split(" ")
+        req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
+        ms = self.tut_utility.get_mock_sum(
+            highlight_color="",
+            highlight_mode=SumHighlightMode.NO_HIGHLIGHT,
+            phase=TextLevel.Phase.DEDUCTION,
+            level=self.level,
+        )
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
+
+
+    def dt_step4(self) -> str:
         deduction_addend_lines = [
             "However, you do know " + TextUtility.blue("how many notes"),
             f"{TextUtility.cyan(self.level.challenge_name)} wants to hear. Make sure your song",
@@ -683,7 +710,7 @@ class TutorialStep:
         )
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled = True, skip_enabled=True)
 
-    def dt_step4(self) -> str:
+    def dt_step5(self) -> str:
         self.text_utility.clear_screen()
         req_line = self.tut_utility.get_requirement(self.level)
         line1_to_add = "Because you don't know the " + TextUtility.blue("song")
@@ -709,7 +736,7 @@ class TutorialStep:
         )
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
-    def dt_step5(self) -> str:
+    def dt_step6(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
@@ -726,7 +753,7 @@ class TutorialStep:
         )
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
-    def dt_step6(self) -> str:
+    def dt_step7(self) -> str:
         thwart_lines = [
             "Sometimes, in the course of playing an",
             "incorrect song you will " + TextUtility.red("exhaust"),
@@ -758,7 +785,7 @@ class TutorialStep:
         )
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_line, ms], back_enabled=True, skip_enabled=True)
 
-    def dt_step7(self) -> str:
+    def dt_step8(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
@@ -836,6 +863,7 @@ class TutorialPlayer:
         TutorialStep.dt_step5,
         TutorialStep.dt_step6,
         TutorialStep.dt_step7,
+        TutorialStep.dt_step8,
     ]
 
 # endregion

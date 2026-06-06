@@ -121,6 +121,8 @@ class TextLevel(Level):
         if presence:
             self.presence = presence
 
+        self.tutorial_phase = None
+
         if self.debug:
             print("CREATED NEW TEXT LEVEL")
             print(f"id: {self.id}")
@@ -286,8 +288,11 @@ class TextLevel(Level):
 
     def phase(self) -> Phase:
         if self.orpheus_only or \
-            (self.level.state == self.level.LevelState.READY) or \
-            (self.level.state == self.level.LevelState.ORPHEUS_FATAL):
+            (
+                self.level.state == self.level.LevelState.READY
+               ) or (
+                self.level.state == self.level.LevelState.ORPHEUS_FATAL
+            ):
             return self.Phase.ORPHEUS
 
         if (self.level.state == self.level.LevelState.ORPHEUS_SUCCESS) or \
@@ -321,7 +326,7 @@ class TextLevel(Level):
             return False
         
         self.reset()
-        self.run()
+        self.run(tutorial_phase=self.tutorial_phase)
         return True
 
     def end(self):
@@ -435,7 +440,7 @@ class TextLevel(Level):
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
-            title_line += f" ({str(self.level.get_state())})"
+            title_line += f" ({self.level.get_state()}, {self.tutorial_phase}, {self.phase()})"
 
         term_width = self.text_utility.get_term_width()
         res += ("=" * term_width)
@@ -461,7 +466,7 @@ class TextLevel(Level):
         description = self.descriptions[self.description_idx % len(self.descriptions)]
 
         if self.debug:
-            title_line += f" ({str(self.level.get_state())})"
+            title_line += f" ({self.level.get_state()}, {self.tutorial_phase}, {self.phase()})"
 
         term_width = self.text_utility.get_term_width()
         print("=" * term_width)
@@ -601,7 +606,7 @@ class TextLevel(Level):
 
     def run(
         self,
-        tutorial_phase: t.Optional[TextLevel.TutorialPhase] = TutorialPhase.NO_TUT,
+        tutorial_phase: t.Optional[TextLevel.TutorialPhase] = None,
     ) -> t.Union[bool, TextLevel]:
         def _accept_notes(
             notes: t.List[Note],
@@ -705,48 +710,54 @@ class TextLevel(Level):
             return total, len(notes)
 
         try:  
-            if (tutorial_phase == TextLevel.TutorialPhase.NO_TUT):
+            if self.debug:
+                print(f"Tutorial phases: {tutorial_phase}, {self.tutorial_phase}")
+                _ = input("<enter>")
+
+            if tutorial_phase:
+                self.tutorial_phase = tutorial_phase
+
+            if (self.tutorial_phase == TextLevel.TutorialPhase.NO_TUT):
                 if self.presence:
                     self.presence.update(state=self.get_title())
                     
-            if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
-                self.state = Level.LevelState.ORPHEUS_SUCCESS
-            else:
-                # ORPHEUS PHASE      
-                if self.debug:
-                    print("Entering Orpheus phase...")             
+            # ORPHEUS PHASE      
+            if self.debug:
+                print("Entering Orpheus phase...")   
 
-                try:
-                    total, _ = _accept_notes([], 0)
-                    self.level.try_orpheus(total)
-                except TextLevel.QuitGameException:
-                    return False
+            try:
+                total, _ = _accept_notes([], 0)
+                self.level.try_orpheus(total)
+            except TextLevel.QuitGameException:
+                return False
 
-                if self.level.state == Level.LevelState.ORPHEUS_FATAL:
-                    self.print_fatal_msg()
-                    return self.quit_or_try_again()
+            if self.level.state == Level.LevelState.ORPHEUS_FATAL:
+                self.print_fatal_msg()
+                return self.quit_or_try_again()
 
-                if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
-                    print(f"Got unexpected level state {str(self.level.state)}")
-                    self.text_utility.wait_for_enter()
-                    
-                    return False
+            if self.level.state != Level.LevelState.ORPHEUS_SUCCESS:
+                print(f"Got unexpected level state {str(self.level.state)}")
+                self.text_utility.wait_for_enter()
+                
+                return False
 
             # DEDUCTION PHASE
             if not self.orpheus_only:
-                if tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
+                if self.tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
                     return True
                 
-                if (tutorial_phase == TextLevel.TutorialPhase.NO_TUT) or \
-                    (tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START):         
+                if (self.tutorial_phase == TextLevel.TutorialPhase.NO_TUT) or \
+                    (self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START) or \
+                    (self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END):    
                     self.level.set_eurydice_goal()
-
-                if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START:
+                
+                if self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_START:
                     return self
 
                 if self.debug:
                     print(f"Set Eurydice's goal to {self.level.eurydice_goal.val} ({self.level.eurydice_goal.sum_len} addends)")
                 
+                print(self.level.state)
                 while (self.level.state == Level.LevelState.ORPHEUS_SUCCESS) or (
                     self.level.state == Level.LevelState.EURYDICE_FAIL
                 ):
@@ -774,6 +785,7 @@ class TextLevel(Level):
                         if self.debug:
                             print("BEFORE: lives: ", str(self.level.eurydice_lives), " state: ", str(self.level.state))
                             _ = input()
+
                         self.level.resolve_thwart()
                         self.text_utility.wait_for_enter()
                         continue
@@ -782,13 +794,16 @@ class TextLevel(Level):
                         self.print_fail_msg()
                         continue
                     elif self.level.state == Level.LevelState.EURYDICE_FATAL:
+                        if self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
+                            self.level.state = Level.LevelState.READY
+
                         self.print_fatal_msg()
                         return self.quit_or_try_again()
                     
                     elif self.level.state == Level.LevelState.SUCCESS:
                         self.print_success_msg()
 
-                        if tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
+                        if self.tutorial_phase == TextLevel.TutorialPhase.DEDUCTION_END:
                             lines = [
                                 "Nice work. Now you know how to play both for",
                                 "yourself and for others.",
@@ -799,7 +814,8 @@ class TextLevel(Level):
                             self.text_utility.wait_for_enter()
 
                         return True
-            elif tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY and\
+                    
+            elif self.tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY and\
                 self.level.state == Level.LevelState.ORPHEUS_SUCCESS:
                 lines = [
                     "Nice work. You're ready for the hard part.",
