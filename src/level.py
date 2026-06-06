@@ -777,7 +777,6 @@ class TextLevel(Level):
                     return True
   
                 goal_set = self.level.set_eurydice_goal()
-                _ = input("<enter>")
 
                 if not goal_set:
                     self.end(selfish=True)
