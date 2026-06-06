@@ -776,7 +776,7 @@ class TextLevel(Level):
                 if self.tutorial_phase == TextLevel.TutorialPhase.ORPHEUS_ONLY:
                     return True
   
-                goal_set = self.level.set_eurydice_goal()
+                goal_set = self.level.set_eurydice_goal(selfishness_enabled=self.difficulty.lyre_difficulty.selfishness_enabled)
 
                 if not goal_set:
                     self.end(selfish=True)
