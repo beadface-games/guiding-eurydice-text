@@ -37,7 +37,7 @@ class Menu:
         debug: t.Optional[bool] = False,
         rng: t.Optional[random.Random] = None,
         presence: t.Optional[Presence] = None,
-        nix_presence: t.Optional[bool] = True,
+        nix_presence: t.Optional[bool] = False,
     ):
         self.debug = debug
         self.rng = rng or random.Random()
@@ -75,7 +75,7 @@ class ProfileMenu(Menu):
         rng: t.Optional[random.Random] = None,
         user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
         presence: t.Optional[Presence] = None,
-        nix_presence: t.Optional[bool] = True,
+        nix_presence: t.Optional[bool] = False,
     ):
         self.rng = rng or random.Random()
         super().__init__(debug=debug, rng=self.rng, presence=presence)

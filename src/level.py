@@ -69,7 +69,6 @@ class TextLevel(Level):
         given_seed: t.Optional[int] = None,
         presence: t.Optional[Presence] = None,
     ) -> None:
-        print("received id", id)
         self.id = id or None
         self.title = title or ""
         self.difficulty = difficulty or Difficulty()
