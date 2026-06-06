@@ -100,7 +100,7 @@ NOTE_ID_LINES = [
 NOTE_MARK_LINES = [
     "To " + TextUtility.cyan("mark") + " a note, type its ID followed by one of the ",
     "following special characters: " + TextUtility.green("!") + ", " + TextUtility.yellow("?") + ", or " + TextUtility.red("X"),
-    TextUtility.green("!") + " will put a " + TextUtility.green("✓") + " next to the note's ID. " + TextUtility.yellow("?") + " will put a " + TextUtility.yellow("?") + " there, and " + TextUtility.red("X") + " will put a " + TextUtility.red("✗") + " there.",
+    TextUtility.green("!") + " will put a " + TextUtility.green(TextUtility.V) + " next to the note's ID. " + TextUtility.yellow("?") + " will put a " + TextUtility.yellow(TextUtility.Q) + " there, and " + TextUtility.red("X") + " will put a " + TextUtility.red(TextUtility.X) + " there.",
     "To remove a note's existing mark, just type its ID followed",
     "by the same special character. To replace a note's existing",
     "mark, type its ID followed by the new mark you wish to apply."

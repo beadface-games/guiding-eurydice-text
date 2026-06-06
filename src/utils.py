@@ -141,6 +141,10 @@ class TextUtility:
     MAGENTA = "\x1b[95m" if is_probably_old_windows_console() else "\x1b[35m"
     CYAN = "\x1b[96m" if is_probably_old_windows_console() else "\x1b[36m"
     BOLD = "1"
+
+    X = "X" if is_probably_old_windows_console() else "✗"
+    V = "V" if is_probably_old_windows_console() else "✓"
+    Q = "?"
     
     @staticmethod
     def red(s: str) -> str:
