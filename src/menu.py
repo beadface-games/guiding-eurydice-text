@@ -380,7 +380,9 @@ class ProfileMenu(Menu):
 
             profile = Profile(
                 id,
-                name
+                name,
+                presence=self.presence,
+                debug=self.debug,
             )
 
             profile.save()

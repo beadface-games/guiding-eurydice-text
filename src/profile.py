@@ -184,6 +184,7 @@ class Profile():
         has_viewed_tut: t.Optional[bool] = False,
         debug: t.Optional[bool] = False,
         user_data_manager: t.Optional[UserDataManager] = UserDataManager(),
+        presence: t.Optional[Presence] = None,
     ):
         self.id = id
         self.name = name or ""
@@ -197,6 +198,9 @@ class Profile():
         self.user_data_manager = user_data_manager
 
         self.text_utility = TextUtility(debug=self.debug)
+
+        if presence:
+            self.presence = presence
 
         if len(self.level_infos.keys()) < 1:
             self.init_levels()
@@ -265,6 +269,7 @@ class Profile():
             level_data_dir=level_data_dir,
             has_viewed_intro=has_viewed_intro,
             has_viewed_tut=has_viewed_tut,
+            presence=presence,
             debug=debug
         )
     
