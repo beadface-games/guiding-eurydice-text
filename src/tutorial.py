@@ -669,11 +669,11 @@ class TutorialStep:
         hdr = self.level.get_header(omit_description=True)
         req_lines = self.tut_utility.get_requirement(self.level).split(" ")
         req_line = TextUtility.cyan(req_lines[0]) + " " + " ".join(req_lines[1:len(req_lines) - 1]) + " " + TextUtility.blue(req_lines[len(req_lines) - 1])
-        line_to_insert = "play the song " + req_line.split(":")[0] + "."
-        DEDUCTION_NOTE_POOL_LINES.insert(
-            len(DEDUCTION_NOTE_POOL_LINES),
-            line_to_insert,
-        )
+        #line_to_insert = "play the song " + req_line.split(":")[0] + "."
+        # DEDUCTION_NOTE_POOL_LINES.insert(
+        #     len(DEDUCTION_NOTE_POOL_LINES),
+        #     line_to_insert,
+        # )
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             DEDUCTION_NOTE_POOL_LINES,
