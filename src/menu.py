@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime as dt
-from pypresence import Presence
+from pypresence import DiscordNotFound, DiscordError, Presence
 
 import json
 import os
@@ -51,8 +51,15 @@ class Menu:
         if presence:
             self.presence = presence
         elif not nix_presence:
-            self.presence = Presence(DISCORD_APP_ID)
-            self.presence.connect()
+            try:
+                self.presence = Presence(DISCORD_APP_ID)
+                self.presence.connect()
+            except DiscordNotFound:
+                if self.debug:
+                    print("Discord not found. Skipping pypresence.")
+            except DiscordError as e:
+                if self.debug:
+                    print(f"Got DiscordError {e.message}. Skipping pypresence.")
 
     def quit(self):
         self.text_utility.clear_screen()

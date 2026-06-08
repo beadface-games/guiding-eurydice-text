@@ -11,7 +11,7 @@ from guiding_eurydice_core.src.lyre import Lyre, Note
 
 from src.level import RequirementVerb, TextLevel
 from src.profile import Profile
-from src.utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility
+from src.utils import CONTINUE_PROMPT, B_FOR_BACK_STR_SCREEN, DEFAULT_TUT_DATA_DIR, Q_TO_MENU_STR, S_TO_SKIP_STR, PROMPT_STR, TextUtility, UserDataManager
 
 # region intro lines
 
@@ -501,20 +501,6 @@ class TutorialStep:
         print(lvl_text)
         return self.tut_utility.pad_and_continue(lvl_text.split("\n"), back_enabled=False, skip_enabled=True)
 
-    def ot_step3(self) -> str:
-        self.text_utility.clear_screen()
-        hdr = self.level.get_header(omit_description=True)
-        lr = self.tut_utility.get_lyre_with_lines(
-            self.level.level.lyre,
-            NOTE_ID_LINES,
-            LyreHighlightMode.NOTE_IDS,
-            lyre_highlight_color=TextUtility.YELLOW
-            )
-        eq = ("=" * self.text_utility.get_term_width())
-        req_lines = self.tut_utility.get_requirement(self.level)
-        ms = self.tut_utility.get_mock_sum()
-        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
-
     def ot_step2(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
@@ -529,12 +515,26 @@ class TutorialStep:
         ms = self.tut_utility.get_mock_sum()
         return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
 
-    def ot_step4(self) -> str:
+    def ot_step3(self) -> str:
         self.text_utility.clear_screen()
         hdr = self.level.get_header(omit_description=True)
         lr = self.tut_utility.get_lyre_with_lines(
             self.level.level.lyre,
             NOTE_ID_LINES,
+            LyreHighlightMode.NOTE_IDS,
+            lyre_highlight_color=TextUtility.YELLOW
+            )
+        eq = ("=" * self.text_utility.get_term_width())
+        req_lines = self.tut_utility.get_requirement(self.level)
+        ms = self.tut_utility.get_mock_sum()
+        return self.tut_utility.pad_and_continue([hdr, lr, eq, req_lines, ms], back_enabled=True, skip_enabled=True)
+
+    def ot_step4(self) -> str:
+        self.text_utility.clear_screen()
+        hdr = self.level.get_header(omit_description=True)
+        lr = self.tut_utility.get_lyre_with_lines(
+            self.level.level.lyre,
+            NOTE_MARK_LINES,
             LyreHighlightMode.NO_HIGHLIGHT,
             lyre_highlight_color=TextUtility.YELLOW
             )
@@ -591,7 +591,7 @@ class TutorialStep:
         self.text_utility.clear_screen()
         req_line = self.tut_utility.get_requirement(self.level)
         line1_to_add = TextUtility.cyan("you need") + ", shown after the line " 
-        line2_to_add = TextUtility.cyan(req_line.split(":")[0]) + "\"."
+        line2_to_add = TextUtility.cyan(req_line.split(":")[0]) + "."
         if len(TARGET_VALUE_LINES) == 4:
             TARGET_VALUE_LINES.insert(1, line2_to_add)
             TARGET_VALUE_LINES.insert(1, line1_to_add)
@@ -821,17 +821,21 @@ class TutorialPlayer:
         rng: t.Optional[random.Random] = None,
         tut_data_dir: t.Optional[pathlib.Path] = None,
         presence: t.Optional[Presence] = None,
+        udm: t.Optional[UserDataManager] = UserDataManager()
     ):
         self.profile = profile
         self.text_utility = text_utility
 
         self.tut_data_dir = tut_data_dir or pathlib.Path(DEFAULT_TUT_DATA_DIR)
+
         self.debug = debug
         self.rng = rng or random.Random()
 
         self.presence = None
         if presence:
             self.presence = presence
+
+        self.udm = udm
         
         self.requirement_verb_idx = self.rng.randint(0, len(TextLevel.REQUIREMENT_VERBS))
         self.requirement_verb = requirement_verb or TextLevel.REQUIREMENT_VERBS[self.requirement_verb_idx % len(TextLevel.REQUIREMENT_VERBS)]
@@ -875,25 +879,25 @@ class TutorialPlayer:
 
 # endregion
     def load_tut_levels(self) -> t.List[TextLevel]:
-        if not os.path.exists(self.tut_data_dir):
-            raise FileNotFoundError(f"Unable to find tutorial directory {self.tut_data_dir}")
+        if not os.path.exists(self.udm.resource_path(self.tut_data_dir)):
+            raise FileNotFoundError(f"Unable to find tutorial directory {self.udm.resource_path(self.tut_data_dir)}")
 
         files = []
-        for _, _, filenames in os.walk(self.profile.level_data_dir):
+        for _, _, filenames in os.walk(self.udm.resource_path(self.tut_data_dir)):
             files.extend(filenames)
 
         tuts = [file for file in files if file.startswith("tut")]
 
         if len(tuts) == 0:
-            raise FileNotFoundError(f"No tutorial levels found in tutorial directory {self.tut_data_dir}")
+            raise FileNotFoundError(f"No tutorial levels found in tutorial directory {self.udm.resource_path(self.tut_data_dir)}")
 
         if len(tuts) != 2:
-            raise FileNotFoundError(f"Found wrong number of tutorial level definitions in {self.tut_data_dir}: {len(files)} (expected 2)")
+            raise FileNotFoundError(f"Found wrong number of tutorial level definitions in {self.udm.resource_path(self.tut_data_dir)}: {len(files)} (expected 2)")
         
         levels = []
         for f in tuts:
             tl = TextLevel.from_json(
-                json_path=self.tut_data_dir.joinpath(f),
+                json_path=self.udm.resource_path(self.tut_data_dir).joinpath(f),
                 debug=self.debug,
                 presence=self.presence,
             )
